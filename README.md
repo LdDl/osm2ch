@@ -1,3 +1,7 @@
+[![GoDoc](https://godoc.org/github.com/LdDl/osm2ch?status.svg)](https://godoc.org/github.com/LdDl/osm2ch)
+[![Sourcegraph](https://sourcegraph.com/github.com/LdDl/osm2ch/-/badge.svg)](https://sourcegraph.com/github.com/LdDl/osm2ch?badge)
+[![Go Report Card](https://goreportcard.com/badge/github.com/LdDl/osm2ch)](https://goreportcard.com/report/github.com/LdDl/osm2ch)
+[![GitHub tag](https://img.shields.io/github/tag/LdDl/osm2ch.svg)](https://github.com/LdDl/osm2ch/releases)
 # osm2ch
 ## Convert *.osm.pbf files to CSV for [contraction hierarchies library](https://github.com/LdDl/ch)
 
