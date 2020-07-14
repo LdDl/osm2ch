@@ -1,5 +1,7 @@
 github.com/LdDl/ch v1.3.4 h1:Mgn/mLr83j2Mmk3AstQ1go1knQZrDHelq5R9zj/kCIg=
 github.com/LdDl/ch v1.3.4/go.mod h1:CQwLYUgzqhyIQscCxN8ErzI8cI2R/QkIVcYHFQDUf0c=
+github.com/LdDl/ch v1.4.5 h1:x4vwZiDTN76pG/dpyqC6yWhpVjuUX2cVU1Nqg7pN8vA=
+github.com/LdDl/ch v1.4.5/go.mod h1:KsNhVcHlm49ysISIlc4fnUKR3jsdylDvJ1DC83OZVl8=
 github.com/gogo/protobuf v1.3.0 h1:G8O7TerXerS4F6sx9OV7/nRfJdnXgHZu/S/7F2SN+UE=
 github.com/gogo/protobuf v1.3.0/go.mod h1:SlYgWuQ5SjCEi6WLHjHCa1yvBfUnHcTbrrZtXPKa29o=
 github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
