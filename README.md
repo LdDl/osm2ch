@@ -40,8 +40,8 @@ PRs are welcome!
     After installation step is complete you can call 'osm2ch' from any place in your system.
 
 * Or download prebuilt binary and make updates in yours PATH environment varibale (both Linux and Windows):
-    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.1.0/windows-osm2ch.zip
-    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.1.0/linux-osm2ch.tar.xz
+    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.0.0/windows-osm2ch.zip
+    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.0.0/linux-osm2ch.tar.xz
 ## Usage
 ```shell
 osm2ch -h
