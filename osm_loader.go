@@ -61,7 +61,7 @@ type expandedEdge struct {
 /*
 	map[newSourceVertexID]map[newTargetVertexID]newExpandedEdge
 */
-type ExpandedGraph map[int64]map[int64]*expandedEdge
+type ExpandedGraph map[int64]map[int64]expandedEdge
 
 // ImportFromOSMFile Imports graph from file of PBF-format (in OSM terms)
 /*
@@ -126,26 +126,34 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 						vertices[source] = true
 						vertices[target] = true
 						if _, ok := newEdges[source]; !ok {
-							newEdges[source] = make(map[int64]*expandedEdge)
+							newEdges[source] = make(map[int64]expandedEdge)
 						}
-						newEdges[source][target] = &expandedEdge{
-							ID:   newEdgeID,
-							Cost: cost,
-							Geom: []geoPoint{a, b},
-						}
-						newEdgeID++
+
 						if oneway == false {
-							if _, ok := newEdges[target]; !ok {
-								newEdges[target] = make(map[int64]*expandedEdge)
+							newEdges[source][target] = expandedEdge{
+								ID:   newEdgeID,
+								Cost: cost,
+								Geom: []geoPoint{a, b},
 							}
-							newEdges[target][source] = &expandedEdge{
+							newEdgeID++
+
+							if _, ok := newEdges[target]; !ok {
+								newEdges[target] = make(map[int64]expandedEdge)
+							}
+							newEdges[target][source] = expandedEdge{
 								ID:   newEdgeID,
 								Cost: cost,
 								Geom: []geoPoint{b, a},
 							}
 							newEdgeID++
 						} else {
-							newEdges[source][target].WasOneWay = true
+							newEdges[source][target] = expandedEdge{
+								ID:        newEdgeID,
+								Cost:      cost,
+								Geom:      []geoPoint{a, b},
+								WasOneWay: true,
+							}
+							newEdgeID++
 						}
 					}
 				}
@@ -255,9 +263,9 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					}
 
 					if _, ok := expandedGraph[sourceExpandVertex.ID]; !ok {
-						expandedGraph[sourceExpandVertex.ID] = make(map[int64]*expandedEdge)
+						expandedGraph[sourceExpandVertex.ID] = make(map[int64]expandedEdge)
 					}
-					expandedGraph[sourceExpandVertex.ID][targetExpandVertex.ID] = &expandedEdge{
+					expandedGraph[sourceExpandVertex.ID][targetExpandVertex.ID] = expandedEdge{
 						Cost:      (sourceCost + targetCost) / 2.0,
 						Geom:      []geoPoint{sourceMiddlePoint, sourceExpandVertex.Geom[1], targetMiddlePoint},
 						WasOneWay: sourceExpandVertex.WasOneWay,
@@ -339,7 +347,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					saveExde := expandedGraph[fromExp][toExp]
 					if _, ok := expandedGraph[fromExp]; ok {
 						delete(expandedGraph, fromExp)
-						expandedGraph[fromExp] = make(map[int64]*expandedEdge)
+						expandedGraph[fromExp] = make(map[int64]expandedEdge)
 						expandedGraph[fromExp][toExp] = saveExde
 					}
 				}
