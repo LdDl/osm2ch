@@ -81,6 +81,7 @@ Header of CSV-file is: from_vertex_id;to_vertex_id;weights;geom
 - to_vertex_id Target vertex;
 - weight Traveling cost from source to target (actually length of edge in kilometers);
 - geom Geometry of edge in WKT or GeoJSON format.
+- was_one_way Boolean value. When source OSM way was "one way" then it's true, otherwise it's false. Might be helpfull for ignore edges with WasOneWay=true when offesting overlapping two-way geometries in some GIS viewer
 
 Now you can use this graph in [contraction hierarchies library].
 

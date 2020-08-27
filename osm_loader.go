@@ -51,9 +51,10 @@ type restrictionComponent struct {
 
 // expandedEdge New edge built on top of two adjacent edges
 type expandedEdge struct {
-	ID   int64
-	Cost float64
-	Geom []geoPoint
+	ID        int64
+	Cost      float64
+	Geom      []geoPoint
+	WasOneWay bool // Former OSM object was one way.
 }
 
 // ExpandedGraph Representation of edge expanded graph
@@ -66,7 +67,7 @@ type ExpandedGraph map[int64]map[int64]expandedEdge
 /*
 	File should have PBF (Protocolbuffer Binary Format) extension according to https://github.com/paulmach/osm
 */
-func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (*ExpandedGraph, error) {
+func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, error) {
 	f, err := os.Open(fileName)
 	if err != nil {
 		return nil, err
@@ -127,13 +128,15 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (*ExpandedGraph, 
 						if _, ok := newEdges[source]; !ok {
 							newEdges[source] = make(map[int64]expandedEdge)
 						}
-						newEdges[source][target] = expandedEdge{
-							ID:   newEdgeID,
-							Cost: cost,
-							Geom: []geoPoint{a, b},
-						}
-						newEdgeID++
+
 						if oneway == false {
+							newEdges[source][target] = expandedEdge{
+								ID:   newEdgeID,
+								Cost: cost,
+								Geom: []geoPoint{a, b},
+							}
+							newEdgeID++
+
 							if _, ok := newEdges[target]; !ok {
 								newEdges[target] = make(map[int64]expandedEdge)
 							}
@@ -141,6 +144,14 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (*ExpandedGraph, 
 								ID:   newEdgeID,
 								Cost: cost,
 								Geom: []geoPoint{b, a},
+							}
+							newEdgeID++
+						} else {
+							newEdges[source][target] = expandedEdge{
+								ID:        newEdgeID,
+								Cost:      cost,
+								Geom:      []geoPoint{a, b},
+								WasOneWay: true,
 							}
 							newEdgeID++
 						}
@@ -255,8 +266,9 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (*ExpandedGraph, 
 						expandedGraph[sourceExpandVertex.ID] = make(map[int64]expandedEdge)
 					}
 					expandedGraph[sourceExpandVertex.ID][targetExpandVertex.ID] = expandedEdge{
-						Cost: (sourceCost + targetCost) / 2.0,
-						Geom: []geoPoint{sourceMiddlePoint, sourceExpandVertex.Geom[1], targetMiddlePoint},
+						Cost:      (sourceCost + targetCost) / 2.0,
+						Geom:      []geoPoint{sourceMiddlePoint, sourceExpandVertex.Geom[1], targetMiddlePoint},
+						WasOneWay: sourceExpandVertex.WasOneWay,
 					}
 				}
 			}
@@ -396,7 +408,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (*ExpandedGraph, 
 	log.Printf("Not properly handeled restrictions: %d\n", immposibleRestrictions)
 	log.Printf("Number of unknow restriction roles (only 'from', 'to' and 'via' supported): %d\n", unsupportedRestrictionRoles)
 
-	return &expandedGraph, nil
+	return expandedGraph, nil
 }
 
 // degreesToRadians deg = r * pi / 180

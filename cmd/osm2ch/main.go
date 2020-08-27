@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/LdDl/osm2ch"
@@ -44,12 +45,12 @@ func main() {
 	defer writer.Flush()
 	writer.Comma = ';'
 
-	err = writer.Write([]string{"from_vertex_id", "to_vertex_id", "one_way", "weight", "geom"})
+	err = writer.Write([]string{"from_vertex_id", "to_vertex_id", "one_way", "weight", "geom", "was_one_way"})
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	for source, targets := range *edgeExpandedGraph {
+	for source, targets := range edgeExpandedGraph {
 		for target, expEdge := range targets {
 			geomStr := ""
 			if strings.ToLower(*geomFormat) == "geojson" {
@@ -61,7 +62,7 @@ func main() {
 			if strings.ToLower(*units) == "m" {
 				cost *= 1000.0
 			}
-			err = writer.Write([]string{fmt.Sprintf("%d", source), fmt.Sprintf("%d", target), "FT", fmt.Sprintf("%f", cost), geomStr})
+			err = writer.Write([]string{fmt.Sprintf("%d", source), fmt.Sprintf("%d", target), "FT", fmt.Sprintf("%f", cost), geomStr, strconv.FormatBool(expEdge.WasOneWay)})
 			if err != nil {
 				log.Fatalln(err)
 			}
