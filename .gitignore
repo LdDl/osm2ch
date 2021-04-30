@@ -2,4 +2,5 @@
 cmd/osm2ch/osm2ch
 cmd/osm2ch/osm2ch.exe
 cmd/osm2ch/*.zip
+cmd/osm2ch/*.tar.gz
 cmd/osm2ch/*.csv
