@@ -1,0 +1,5 @@
+.build.sh
+cmd/osm2ch/osm2ch
+cmd/osm2ch/osm2ch.exe
+cmd/osm2ch/*.zip
+cmd/osm2ch/*.csv

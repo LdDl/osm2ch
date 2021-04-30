@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,12 +15,11 @@ import (
 )
 
 var (
-	tagStr        = flag.String("tags", "motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link", "Set of needed tags (separated by commas)")
-	osmFileName   = flag.String("file", "my_graph.osm.pbf", "Filename of *.osm.pbf file (it has to be compressed)")
-	out           = flag.String("out", "my_graph.csv", "Filename of 'Comma-Separated Values' (CSV) formatted file")
-	geomFormat    = flag.String("geomf", "wkt", "Format of output geometry. Expected values: wkt / geojson")
-	units         = flag.String("units", "km", "Units of output weights. Expected values: km for kilometers / m for meters")
-	doContraction = flag.Bool("contraction", false, "Do contraction? Expected values: false - not / true - yes")
+	tagStr      = flag.String("tags", "motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link", "Set of needed tags (separated by commas)")
+	osmFileName = flag.String("file", "my_graph.osm.pbf", "Filename of *.osm.pbf file (it has to be compressed)")
+	out         = flag.String("out", "my_graph.csv", "Filename of 'Comma-Separated Values' (CSV) formatted file. E.g.: if file name is 'map.csv' then 3 files will be produced: 'map.csv' (edges), 'map_vertices.csv', 'map_shortcuts.csv'")
+	geomFormat  = flag.String("geomf", "wkt", "Format of output geometry. Expected values: wkt / geojson")
+	units       = flag.String("units", "km", "Units of output weights. Expected values: km for kilometers / m for meters")
 )
 
 func main() {
@@ -38,33 +38,55 @@ func main() {
 		return
 	}
 
-	file, err := os.Create(*out)
+	fnamePart := strings.Split(*out, ".csv") // to guarantee proper filename and its extension
+	fnameEdges := fmt.Sprintf(fnamePart[0] + ".csv")
+	fnameVertices := fmt.Sprintf(fnamePart[0] + "_vertices.csv")
+	fnameShortcuts := fmt.Sprintf(fnamePart[0] + "_shortcuts.csv")
+	/* Edges file */
+	fileEdges, err := os.Create(fnameEdges)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	defer file.Close()
-
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-	writer.Comma = ';'
-
+	defer fileEdges.Close()
+	writerEdges := csv.NewWriter(fileEdges)
+	defer writerEdges.Flush()
+	writerEdges.Comma = ';'
 	// 		from_vertex_id - int64, ID of source vertex
-	// 		to_vertex_id - int64, ID of arget vertex
-	// 		f_internal - int64, Internal ID of source vertex
-	// 		t_internal - int64, Internal ID of target vertex
+	// 		to_vertex_id - int64, ID of target vertex
 	// 		weight - float64, Weight of an edge
-	// 		via_vertex_id - int64, ID of vertex through which the contraction exists (-1 if no contraction)
-	// 		v_internal - int64, Internal ID of vertex through which the contraction exists (-1 if no contraction)
 	//      geom - geometry (WKT or GeoJSON representation)
 	//      was_one_way - if edge was one way
-	err = writer.Write([]string{"from_vertex_id", "to_vertex_id", "f_internal", "t_internal", "weight", "via_vertex_id", "v_internal", "geom", "was_one_way"})
+	err = writerEdges.Write([]string{"from_vertex_id", "to_vertex_id", "weight", "geom", "was_one_way"})
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	/* Vertices file */
+	fileVertices, err := os.Create(fnameVertices)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer fileVertices.Close()
+	writerVertices := csv.NewWriter(fileVertices)
+	defer writerVertices.Flush()
+	writerVertices.Comma = ';'
+	// 		vertex_id - int64, ID of vertex
+	// 		order_pos - int, Position of vertex in hierarchies (evaluted by library)
+	// 		importance - int, Importance of vertex in graph (evaluted by library)
+	//      geom - geometry (WKT or GeoJSON representation)
+	err = writerVertices.Write([]string{"vertex_id", "order_pos", "importance", "geom"})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	verticesGeoms := make(map[int64]osm2ch.GeoPoint)
 	graph := ch.Graph{}
+
+	// Prepare graph and write edges
 	for source, targets := range edgeExpandedGraph {
 		err := graph.CreateVertex(source)
 		if err != nil {
@@ -86,52 +108,65 @@ func main() {
 				err = errors.Wrap(err, "Can not wrap Source and Targed vertices as Edge")
 				return
 			}
+
+			if _, ok := verticesGeoms[source]; !ok {
+				verticesGeoms[source] = osm2ch.GeoPoint{Lon: expEdge.Geom[0].Lon, Lat: expEdge.Geom[0].Lat}
+			}
+			if _, ok := verticesGeoms[target]; !ok {
+				verticesGeoms[target] = osm2ch.GeoPoint{Lon: expEdge.Geom[2].Lon, Lat: expEdge.Geom[2].Lat}
+			}
+
+			geomStr := ""
+			if strings.ToLower(*geomFormat) == "geojson" {
+				geomStr = osm2ch.PrepareGeoJSONLinestring(expEdge.Geom)
+			} else {
+				geomStr = osm2ch.PrepareWKTLinestring(expEdge.Geom)
+			}
+			err = writerEdges.Write([]string{fmt.Sprintf("%d", source), fmt.Sprintf("%d", target), fmt.Sprintf("%f", cost), geomStr, strconv.FormatBool(expEdge.WasOneWay)})
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 		}
 	}
 
-	if *doContraction {
-		fmt.Println("Starting contraction process....")
-		st := time.Now()
-		graph.PrepareContracts()
-		fmt.Printf("Done contraction process in %v\n", time.Since(st))
-	}
+	fmt.Println("Starting contraction process....")
+	st := time.Now()
+	graph.PrepareContractionHierarchies()
+	fmt.Printf("Done contraction process in %v\n", time.Since(st))
 
+	/* Write vertices */
 	vertices := graph.Vertices
 	for i := 0; i < len(vertices); i++ {
 		currentVertexExternal := vertices[i].Label
-		// currentVertexInternal := graph.Vertices[i].VertexNum()
-
-		_ = currentVertexExternal
+		vertexGeom := verticesGeoms[currentVertexExternal]
+		geomStr := ""
+		if strings.ToLower(*geomFormat) == "geojson" {
+			geomStr = osm2ch.PrepareGeoJSONPoint(vertexGeom)
+		} else {
+			geomStr = osm2ch.PrepareWKTPoint(vertexGeom)
+		}
+		// Write reference information about vertex
+		err = writerVertices.Write([]string{
+			fmt.Sprintf("%d", currentVertexExternal),
+			fmt.Sprintf("%d", graph.Vertices[i].OrderPos()),
+			fmt.Sprintf("%d", graph.Vertices[i].Importance()),
+			fmt.Sprintf("%s", geomStr),
+		})
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 
-	// for source, targets := range edgeExpandedGraph {
-	// 	for target, expEdge := range targets {
-
-	// 		// 		from_vertex_id - int64, ID of source vertex
-	// 		// 		to_vertex_id - int64, ID of arget vertex
-	// 		// 		f_internal - int64, Internal ID of source vertex
-	// 		// 		t_internal - int64, Internal ID of target vertex
-	// 		// 		weight - float64, Weight of an edge
-	// 		// 		via_vertex_id - int64, ID of vertex through which the contraction exists (-1 if no contraction)
-	// 		// 		v_internal - int64, Internal ID of vertex through which the contraction exists (-1 if no contraction)
-	// 		//      geom - geometry (WKT or GeoJSON representation)
-	// 		//      was_one_way - if edge was one way
-
-	// 		geomStr := ""
-	// 		if strings.ToLower(*geomFormat) == "geojson" {
-	// 			geomStr = osm2ch.PrepareGeoJSONLinestring(expEdge.Geom)
-	// 		} else {
-	// 			geomStr = osm2ch.PrepareWKTLinestring(expEdge.Geom)
-	// 		}
-	// 		cost := expEdge.Cost
-	// 		if strings.ToLower(*units) == "m" {
-	// 			cost *= 1000.0
-	// 		}
-	// 		err = writer.Write([]string{fmt.Sprintf("%d", source), fmt.Sprintf("%d", target), "FT", fmt.Sprintf("%f", cost), geomStr, strconv.FormatBool(expEdge.WasOneWay)})
-	// 		if err != nil {
-	// 			fmt.Println(err)
-	// 			return
-	// 		}
-	// 	}
-	// }
+	/* Write shortcuts */
+	// 	from_vertex_id - int64, ID of source vertex
+	// 	to_vertex_id - int64, ID of arget vertex
+	// 	weight - float64, Weight of an edge
+	// 	via_vertex_id - int64, ID of vertex through which the shortcut exists
+	err = graph.ExportShortcutsToFile(fnameShortcuts)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }
