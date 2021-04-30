@@ -35,8 +35,8 @@ PRs are welcome!
 ## Installation
 * Via 'go get':
     ```shell
-    go get -u github.com/LdDl/osm2ch/...
-    go install github.com/LdDl/osm2ch/...
+    go get github.com/LdDl/osm2ch
+    go install github.com/LdDl/osm2ch/cmd/osm2ch@v1.3.0
     ```
     After installation step is complete you can call 'osm2ch' from any place in your system.
 
