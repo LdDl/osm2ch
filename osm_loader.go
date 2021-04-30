@@ -20,14 +20,14 @@ const (
 	pi180Rev    = 180.0 / math.Pi
 )
 
-// geoPoint Representation of point on Earth
-type geoPoint struct {
+// GeoPoint Representation of point on Earth
+type GeoPoint struct {
 	Lat float64
 	Lon float64
 }
 
-// String Pretty printing for geoPoint
-func (gp geoPoint) String() string {
+// String Pretty printing for GeoPoint
+func (gp GeoPoint) String() string {
 	return fmt.Sprintf("Lon: %f | Lat: %f", gp.Lon, gp.Lat)
 }
 
@@ -53,7 +53,7 @@ type restrictionComponent struct {
 type expandedEdge struct {
 	ID        int64
 	Cost      float64
-	Geom      []geoPoint
+	Geom      []GeoPoint
 	WasOneWay bool // Former OSM object was one way.
 }
 
@@ -77,7 +77,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	scanner := osmpbf.New(context.Background(), f, 4)
 	defer scanner.Close()
 
-	nodes := make(map[int64]geoPoint)
+	nodes := make(map[int64]GeoPoint)
 	vertices := make(map[int64]bool)
 	newEdges := make(ExpandedGraph)
 	newEdgeID := int64(1)
@@ -90,7 +90,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	for scanner.Scan() {
 		obj := scanner.Object()
 		if obj.ObjectID().Type() == "node" {
-			nodes[obj.ObjectID().Ref()] = geoPoint{Lon: obj.(*osm.Node).Lon, Lat: obj.(*osm.Node).Lat}
+			nodes[obj.ObjectID().Ref()] = GeoPoint{Lon: obj.(*osm.Node).Lon, Lat: obj.(*osm.Node).Lat}
 		}
 		if obj.ObjectID().Type() == "way" {
 			tagMap := obj.(*osm.Way).TagMap()
@@ -133,7 +133,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 							newEdges[source][target] = expandedEdge{
 								ID:   newEdgeID,
 								Cost: cost,
-								Geom: []geoPoint{a, b},
+								Geom: []GeoPoint{a, b},
 							}
 							newEdgeID++
 
@@ -143,14 +143,14 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 							newEdges[target][source] = expandedEdge{
 								ID:   newEdgeID,
 								Cost: cost,
-								Geom: []geoPoint{b, a},
+								Geom: []GeoPoint{b, a},
 							}
 							newEdgeID++
 						} else {
 							newEdges[source][target] = expandedEdge{
 								ID:        newEdgeID,
 								Cost:      cost,
-								Geom:      []geoPoint{a, b},
+								Geom:      []GeoPoint{a, b},
 								WasOneWay: true,
 							}
 							newEdgeID++
@@ -267,7 +267,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					}
 					expandedGraph[sourceExpandVertex.ID][targetExpandVertex.ID] = expandedEdge{
 						Cost:      (sourceCost + targetCost) / 2.0,
-						Geom:      []geoPoint{sourceMiddlePoint, sourceExpandVertex.Geom[1], targetMiddlePoint},
+						Geom:      []GeoPoint{sourceMiddlePoint, sourceExpandVertex.Geom[1], targetMiddlePoint},
 						WasOneWay: sourceExpandVertex.WasOneWay,
 					}
 				}
@@ -422,7 +422,7 @@ func radiansTodegrees(d float64) float64 {
 }
 
 // greatCircleDistance Returns distance between two geo-points (kilometers)
-func greatCircleDistance(p, q geoPoint) float64 {
+func greatCircleDistance(p, q GeoPoint) float64 {
 	lat1 := degreesToRadians(p.Lat)
 	lon1 := degreesToRadians(p.Lon)
 	lat2 := degreesToRadians(q.Lat)
@@ -435,7 +435,7 @@ func greatCircleDistance(p, q geoPoint) float64 {
 	return ans
 }
 
-func middlePoint(p, q geoPoint) geoPoint {
+func middlePoint(p, q GeoPoint) GeoPoint {
 	lat1 := degreesToRadians(p.Lat)
 	lon1 := degreesToRadians(p.Lon)
 	lat2 := degreesToRadians(q.Lat)
@@ -446,11 +446,11 @@ func middlePoint(p, q geoPoint) geoPoint {
 
 	latMid := math.Atan2(math.Sin(lat1)+math.Sin(lat2), math.Sqrt((math.Cos(lat1)+Bx)*(math.Cos(lat1)+Bx)+By*By))
 	lonMid := lon1 + math.Atan2(By, math.Cos(lat1)+Bx)
-	return geoPoint{Lat: radiansTodegrees(latMid), Lon: radiansTodegrees(lonMid)}
+	return GeoPoint{Lat: radiansTodegrees(latMid), Lon: radiansTodegrees(lonMid)}
 }
 
 // PrepareWKTLinestring Creates WKT LineString from set of points
-func PrepareWKTLinestring(pts []geoPoint) string {
+func PrepareWKTLinestring(pts []GeoPoint) string {
 	ptsStr := make([]string, len(pts))
 	for i := range pts {
 		ptsStr[i] = fmt.Sprintf("%f %f", pts[i].Lon, pts[i].Lat)
@@ -459,12 +459,27 @@ func PrepareWKTLinestring(pts []geoPoint) string {
 }
 
 // PrepareGeoJSONLinestring Creates GeoJSON LineString from set of points
-func PrepareGeoJSONLinestring(pts []geoPoint) string {
+func PrepareGeoJSONLinestring(pts []GeoPoint) string {
 	pts2d := make([][]float64, len(pts))
 	for i := range pts {
 		pts2d[i] = []float64{pts[i].Lon, pts[i].Lat}
 	}
 	b, err := geojson.NewLineStringGeometry(pts2d).MarshalJSON()
+	if err != nil {
+		fmt.Printf("Warning. Can not convert geometry to geojson format: %s", err.Error())
+		return ""
+	}
+	return string(b)
+}
+
+// PrepareWKTPoint Creates WKT Point from given points
+func PrepareWKTPoint(pt GeoPoint) string {
+	return fmt.Sprintf("POINT(%f %f)", pt.Lon, pt.Lat)
+}
+
+// PrepareGeoJSONPoint Creates GeoJSON Point from given point
+func PrepareGeoJSONPoint(pt GeoPoint) string {
+	b, err := geojson.NewPointGeometry([]float64{pt.Lon, pt.Lat}).MarshalJSON()
 	if err != nil {
 		fmt.Printf("Warning. Can not convert geometry to geojson format: %s", err.Error())
 		return ""

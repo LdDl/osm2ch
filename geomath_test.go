@@ -5,15 +5,15 @@ import (
 )
 
 func TestMiddlePoint(t *testing.T) {
-	p1 := geoPoint{
+	p1 := GeoPoint{
 		Lon: 37.6417350769043,
 		Lat: 55.751849391735284,
 	}
-	p2 := geoPoint{
+	p2 := GeoPoint{
 		Lon: 37.668514251708984,
 		Lat: 55.73261980350401,
 	}
-	res := geoPoint{
+	res := GeoPoint{
 		Lon: 37.65512796336629,
 		Lat: 55.742235325526806,
 	}
@@ -24,11 +24,11 @@ func TestMiddlePoint(t *testing.T) {
 }
 
 func TestGreatCircleDistance(t *testing.T) {
-	p1 := geoPoint{
+	p1 := GeoPoint{
 		Lon: 37.6417350769043,
 		Lat: 55.751849391735284,
 	}
-	p2 := geoPoint{
+	p2 := GeoPoint{
 		Lon: 37.668514251708984,
 		Lat: 55.73261980350401,
 	}
