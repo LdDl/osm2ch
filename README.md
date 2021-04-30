@@ -64,6 +64,8 @@ Usage of osm2ch:
         Set of needed tags (separated by commas) (default "motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link")
   -units string
         Units of output weights. Expected values: km for kilometers / m for meters (default "km")
+  -contract
+        Prepare contraction hierarchies? (default true)
 ```
 The default list of tags is this, since usually these tags are used for routing for personal cars.
 
@@ -73,15 +75,20 @@ You can find example file of *.osm.pbf file in nested child [/example_data](/exa
 
 If you want WKT format for output geometry:
 ```shell
-osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf wkt --units m --tags motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link
+osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf wkt --units m --tags motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link --contract=true
 ```
 
 If you want GeoJSON format for output geometry:
 ```shell
-osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf geojson --units m --tags motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link
+osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf geojson --units m --tags motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link --contract=true
 ```
 
-After that files 'graph.csv', 'graph_vertices.csv', 'graph_shortcuts.csv' will be created.
+If you dont want to prepare contraction hierarchies then:
+```shell
+osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf wkt --units m --tags motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link --contract=false
+```
+
+After that files 'graph.csv', 'graph_vertices.csv', 'graph_shortcuts.csv' will be created (or only 'graph.csv' and 'graph_vertices' if 'contract' flag is set to False).
 
 Header of edges CSV-file is: from_vertex_id;to_vertex_id;weight;geom
 - from_vertex_id - Source vertex;

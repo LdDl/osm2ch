@@ -15,11 +15,12 @@ import (
 )
 
 var (
-	tagStr      = flag.String("tags", "motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link", "Set of needed tags (separated by commas)")
-	osmFileName = flag.String("file", "my_graph.osm.pbf", "Filename of *.osm.pbf file (it has to be compressed)")
-	out         = flag.String("out", "my_graph.csv", "Filename of 'Comma-Separated Values' (CSV) formatted file. E.g.: if file name is 'map.csv' then 3 files will be produced: 'map.csv' (edges), 'map_vertices.csv', 'map_shortcuts.csv'")
-	geomFormat  = flag.String("geomf", "wkt", "Format of output geometry. Expected values: wkt / geojson")
-	units       = flag.String("units", "km", "Units of output weights. Expected values: km for kilometers / m for meters")
+	tagStr        = flag.String("tags", "motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link", "Set of needed tags (separated by commas)")
+	osmFileName   = flag.String("file", "my_graph.osm.pbf", "Filename of *.osm.pbf file (it has to be compressed)")
+	out           = flag.String("out", "my_graph.csv", "Filename of 'Comma-Separated Values' (CSV) formatted file. E.g.: if file name is 'map.csv' then 3 files will be produced: 'map.csv' (edges), 'map_vertices.csv', 'map_shortcuts.csv'")
+	geomFormat    = flag.String("geomf", "wkt", "Format of output geometry. Expected values: wkt / geojson")
+	units         = flag.String("units", "km", "Units of output weights. Expected values: km for kilometers / m for meters")
+	doContraction = flag.Bool("contract", true, "Prepare contraction hierarchies?")
 )
 
 func main() {
@@ -130,10 +131,12 @@ func main() {
 		}
 	}
 
-	fmt.Println("Starting contraction process....")
-	st := time.Now()
-	graph.PrepareContractionHierarchies()
-	fmt.Printf("Done contraction process in %v\n", time.Since(st))
+	if *doContraction {
+		fmt.Println("Starting contraction process....")
+		st := time.Now()
+		graph.PrepareContractionHierarchies()
+		fmt.Printf("Done contraction process in %v\n", time.Since(st))
+	}
 
 	/* Write vertices */
 	vertices := graph.Vertices
@@ -159,14 +162,16 @@ func main() {
 		}
 	}
 
-	/* Write shortcuts */
-	// 	from_vertex_id - int64, ID of source vertex
-	// 	to_vertex_id - int64, ID of arget vertex
-	// 	weight - float64, Weight of an edge
-	// 	via_vertex_id - int64, ID of vertex through which the shortcut exists
-	err = graph.ExportShortcutsToFile(fnameShortcuts)
-	if err != nil {
-		fmt.Println(err)
-		return
+	if *doContraction {
+		/* Write shortcuts */
+		// 	from_vertex_id - int64, ID of source vertex
+		// 	to_vertex_id - int64, ID of arget vertex
+		// 	weight - float64, Weight of an edge
+		// 	via_vertex_id - int64, ID of vertex through which the shortcut exists
+		err = graph.ExportShortcutsToFile(fnameShortcuts)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 }
