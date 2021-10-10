@@ -1,15 +1,5 @@
-github.com/LdDl/ch v1.6.0 h1:1UnNokA/hf7iNAT4Kqmr1aYw6l7tph+1bwHuvDXjJRY=
-github.com/LdDl/ch v1.6.0/go.mod h1:i6JXvviI4GnJRTctKKVo6A0PzqaxaTHKvXhHgqVwFRY=
-github.com/LdDl/ch v1.7.1 h1:EXT/IdY2bbBXLsDbxh7Q1XUZ51H5FdhC8TwdVqv94ds=
-github.com/LdDl/ch v1.7.1/go.mod h1:i6JXvviI4GnJRTctKKVo6A0PzqaxaTHKvXhHgqVwFRY=
-github.com/LdDl/ch v1.7.2 h1:Qfab++XuIUnkBuV8QtgO4N/bELaw5BK2DUQmqO25a8g=
-github.com/LdDl/ch v1.7.2/go.mod h1:i6JXvviI4GnJRTctKKVo6A0PzqaxaTHKvXhHgqVwFRY=
-github.com/LdDl/ch v1.7.3 h1:vvamayiN9eALSRIaZgXVpkkfzN9Jy+eVT8tOmKqz/TU=
-github.com/LdDl/ch v1.7.3/go.mod h1:i6JXvviI4GnJRTctKKVo6A0PzqaxaTHKvXhHgqVwFRY=
-github.com/LdDl/ch v1.7.4 h1:5wC+a45tyYLIMeXWANDfEZEBOO6Psd9xcFxOuE5W5oI=
-github.com/LdDl/ch v1.7.4/go.mod h1:i6JXvviI4GnJRTctKKVo6A0PzqaxaTHKvXhHgqVwFRY=
-github.com/LdDl/ch v1.7.5 h1:LlbivvKO9CmYrmz0nMB5eGugyVJizBAGa+dn0Fo1Ofw=
-github.com/LdDl/ch v1.7.5/go.mod h1:i6JXvviI4GnJRTctKKVo6A0PzqaxaTHKvXhHgqVwFRY=
+github.com/LdDl/ch v1.7.7 h1:jTrqlG0IaTEnL9AUL6TOCsybHKtUwEm+I1sdvL6owsk=
+github.com/LdDl/ch v1.7.7/go.mod h1:i6JXvviI4GnJRTctKKVo6A0PzqaxaTHKvXhHgqVwFRY=
 github.com/gogo/protobuf v1.3.0 h1:G8O7TerXerS4F6sx9OV7/nRfJdnXgHZu/S/7F2SN+UE=
 github.com/gogo/protobuf v1.3.0/go.mod h1:SlYgWuQ5SjCEi6WLHjHCa1yvBfUnHcTbrrZtXPKa29o=
 github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
