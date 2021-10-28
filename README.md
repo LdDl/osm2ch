@@ -36,13 +36,13 @@ PRs are welcome!
 * Via 'go get':
     ```shell
     go get github.com/LdDl/osm2ch
-    go install github.com/LdDl/osm2ch/cmd/osm2ch@v1.3.0
+    go install github.com/LdDl/osm2ch/cmd/osm2ch@v1.3.2
     ```
     After installation step is complete you can call 'osm2ch' from any place in your system.
 
 * Or download prebuilt binary and make updates in yours PATH environment varibale (both Linux and Windows):
-    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.3.0/windows-osm2ch.zip
-    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.3.0/linux-osm2ch.tar.gz
+    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.3.2/windows-osm2ch.zip
+    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.3.2/linux-osm2ch.tar.gz
 
 ## Usage
 

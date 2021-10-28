@@ -110,6 +110,10 @@ func main() {
 				return
 			}
 
+			if len(expEdge.Geom) < 2 {
+				// Skip bad expanded edges
+				continue
+			}
 			if _, ok := verticesGeoms[source]; !ok {
 				verticesGeoms[source] = osm2ch.GeoPoint{Lon: expEdge.Geom[0].Lon, Lat: expEdge.Geom[0].Lat}
 			}
