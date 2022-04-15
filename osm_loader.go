@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	geojson "github.com/paulmach/go.geojson"
+	"github.com/pkg/errors"
 
 	"github.com/paulmach/osm"
 	"github.com/paulmach/osm/osmpbf"
@@ -70,7 +71,7 @@ type ExpandedGraph map[int64]map[int64]expandedEdge
 func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, error) {
 	f, err := os.Open(fileName)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "File open")
 	}
 	defer f.Close()
 
@@ -241,6 +242,10 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 				}
 			}
 		}
+	}
+
+	if scanner.Err() != nil {
+		return nil, errors.Wrap(scanner.Err(), "Scanner error")
 	}
 
 	expandedGraph := make(ExpandedGraph)
