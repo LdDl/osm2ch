@@ -4,3 +4,5 @@ cmd/osm2ch/osm2ch.exe
 cmd/osm2ch/*.zip
 cmd/osm2ch/*.tar.gz
 cmd/osm2ch/*.csv
+cmd/osm2ch/example_data/map.osm
+cmd/osm2ch/example_data/map.osm.pbf
