@@ -38,13 +38,13 @@ PRs are welcome!
 * Via 'go get':
     ```shell
     go get github.com/LdDl/osm2ch
-    go install github.com/LdDl/osm2ch/cmd/osm2ch@v1.3.2
+    go install github.com/LdDl/osm2ch/cmd/osm2ch@v1.4.0
     ```
     After installation step is complete you can call 'osm2ch' from any place in your system.
 
 * Or download prebuilt binary and make updates in yours PATH environment varibale (both Linux and Windows):
-    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.3.2/windows-osm2ch.zip
-    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.3.2/linux-amd64-osm2ch.tar.gz
+    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.4.0/windows-osm2ch.zip
+    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.4.0/linux-amd64-osm2ch.tar.gz
 
 Note: There is [zlib](https://www.zlib.net/) support in [OSM-pbf parser](https://github.com/paulmach/osm/pull/19).
 If you do not want use it then disable CGO:
