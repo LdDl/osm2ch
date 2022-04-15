@@ -6,12 +6,14 @@
 # osm2ch
 ## Convert *.osm.pbf files to CSV for [contraction hierarchies library](https://github.com/LdDl/ch)
 
-- [About](#about)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Example](#example)
-- [Dependencies](#dependencies)
-- [License](#license)
+- [osm2ch](#osm2ch)
+  - [Convert *.osm.pbf files to CSV for contraction hierarchies library](#convert-osmpbf-files-to-csv-for-contraction-hierarchies-library)
+  - [About](#about)
+  - [Installation](#installation)
+  - [Usage](#usage)
+  - [Example](#example)
+  - [Dependencies](#dependencies)
+  - [License](#license)
 
 ## About
 With this CLI tool you can convert *.osm.pbf (Compressed Open Street Map) file to CSV (Comma-Separated Values) file, which is used in our [contraction hierarchies library].
@@ -43,6 +45,12 @@ PRs are welcome!
 * Or download prebuilt binary and make updates in yours PATH environment varibale (both Linux and Windows):
     * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.3.2/windows-osm2ch.zip
     * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.3.2/linux-amd64-osm2ch.tar.gz
+
+Note: There is [zlib](https://www.zlib.net/) support in [OSM-pbf parser](https://github.com/paulmach/osm/pull/19).
+If you do not want use it then disable CGO:
+```shell
+export CGO_ENABLED=0
+```
 
 ## Usage
 
