@@ -50,6 +50,7 @@ Note: There is [zlib](https://www.zlib.net/) support in [OSM-pbf parser](https:/
 If you do not want use it then disable CGO:
 ```shell
 export CGO_ENABLED=0
+# Then build osm2ch from source
 ```
 
 ## Usage
