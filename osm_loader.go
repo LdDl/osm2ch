@@ -106,6 +106,36 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					ns := obj.(*osm.Way).Nodes
 					way := obj.(*osm.Way)
 					allWays[int64(way.ID)] = &wayComponent{}
+					if oneway == true && tag == "motorway_link" {
+						s := int64(ns[0].ID)
+						t := int64(ns[len(ns)-1].ID)
+						allWays[int64(way.ID)].LastEdge = edgeComponent{from: s, to: t}
+						cost := 0.0
+						for i := 1; i < len(ns); i++ {
+							source := int64(ns[i-1].ID)
+							target := int64(ns[i].ID)
+
+							a := nodes[source]
+							b := nodes[target]
+							cost += greatCircleDistance(a, b) // kilometers
+							vertices[source] = true
+							vertices[target] = true
+							if _, ok := newEdges[source]; !ok {
+								newEdges[source] = make(map[int64]expandedEdge)
+							}
+						}
+						a := nodes[s]
+						b := nodes[t]
+						newEdges[s][t] = expandedEdge{
+							ID:        newEdgeID,
+							Cost:      cost,
+							Geom:      []GeoPoint{a, b},
+							WasOneWay: true,
+						}
+						newEdgeID++
+						continue
+					}
+
 					for i := 1; i < len(ns); i++ {
 						source := int64(ns[i-1].ID)
 						target := int64(ns[i].ID)
@@ -247,6 +277,30 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	if scanner.Err() != nil {
 		return nil, errors.Wrap(scanner.Err(), "Scanner error")
 	}
+
+	// for source := range newEdges {
+	// 	if len(newEdges[source]) == 1 {
+	// 		for target := range newEdges[source] {
+	// 			if len(newEdges[target]) == 1 {
+	// 				for ntarget := range newEdges[target] {
+	// 					// создание нового ребра
+	// 					newEdges[source][ntarget] = expandedEdge{
+	// 						ID:        newEdges[source][target].ID,
+	// 						WasOneWay: newEdges[source][target].WasOneWay,
+	// 						Cost:      newEdges[source][target].Cost + newEdges[target][ntarget].Cost,
+	// 						Geom: []GeoPoint{
+	// 							newEdges[source][target].Geom[0],
+	// 							newEdges[target][ntarget].Geom[0],
+	// 						},
+	// 					}
+	// 					// удаление
+	// 					delete(newEdges[source], target)
+	// 					delete(newEdges[target], ntarget)
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	expandedGraph := make(ExpandedGraph)
 	for source := range newEdges {
