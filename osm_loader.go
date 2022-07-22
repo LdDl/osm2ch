@@ -69,6 +69,11 @@ type ExpandedGraph map[int64]map[int64]expandedEdge
 	File should have PBF (Protocolbuffer Binary Format) extension according to https://github.com/paulmach/osm
 */
 func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, error) {
+	utag := make(map[string]string)
+	utag["motorway_link"] = "highway"
+	utag["secondary_link"] = "highway"
+	utag["primary_link"] = "highway"
+	utag["tertiary_link"] = "highway"
 	f, err := os.Open(fileName)
 	if err != nil {
 		return nil, errors.Wrap(err, "File open")
@@ -106,7 +111,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					ns := obj.(*osm.Way).Nodes
 					way := obj.(*osm.Way)
 					allWays[int64(way.ID)] = &wayComponent{}
-					if oneway == true && tag == "motorway_link" {
+					if _, uok := utag[tag]; uok && oneway {
 						s := int64(ns[0].ID)
 						t := int64(ns[len(ns)-1].ID)
 						allWays[int64(way.ID)].LastEdge = edgeComponent{from: s, to: t}
