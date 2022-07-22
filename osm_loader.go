@@ -283,29 +283,36 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 		return nil, errors.Wrap(scanner.Err(), "Scanner error")
 	}
 
-	// for source := range newEdges {
-	// 	if len(newEdges[source]) == 1 {
-	// 		for target := range newEdges[source] {
-	// 			if len(newEdges[target]) == 1 {
-	// 				for ntarget := range newEdges[target] {
-	// 					// создание нового ребра
-	// 					newEdges[source][ntarget] = expandedEdge{
-	// 						ID:        newEdges[source][target].ID,
-	// 						WasOneWay: newEdges[source][target].WasOneWay,
-	// 						Cost:      newEdges[source][target].Cost + newEdges[target][ntarget].Cost,
-	// 						Geom: []GeoPoint{
-	// 							newEdges[source][target].Geom[0],
-	// 							newEdges[target][ntarget].Geom[0],
-	// 						},
-	// 					}
-	// 					// удаление
-	// 					delete(newEdges[source], target)
-	// 					delete(newEdges[target], ntarget)
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
+	mg := make(ExpandedGraph)
+	for source := range newEdges {
+		if len(newEdges[source]) > 1 {
+			for t := range newEdges[source] {
+				ntarget := t
+				cost := 0.0
+				for {
+					if len(newEdges[ntarget]) != 1 {
+						// создание нового ребра
+						if _, ok := mg[source]; !ok {
+							mg[source] = make(map[int64]expandedEdge)
+						}
+						a := nodes[source]
+						b := nodes[ntarget]
+						mg[source][ntarget] = expandedEdge{
+							ID:        newEdges[source][ntarget].ID,
+							WasOneWay: newEdges[source][ntarget].WasOneWay,
+							Cost:      cost,
+							Geom:      []GeoPoint{a, b},
+						}
+						break
+					}
+					for t := range newEdges[ntarget] {
+						ntarget = t
+					}
+					cost += newEdges[source][ntarget].Cost
+				}
+			}
+		}
+	}
 
 	expandedGraph := make(ExpandedGraph)
 	for source := range newEdges {
@@ -471,6 +478,8 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	log.Printf("Skipped restrictions (which have not exactly 3 members): %d\n", skipped)
 	log.Printf("Not properly handeled restrictions: %d\n", immposibleRestrictions)
 	log.Printf("Number of unknow restriction roles (only 'from', 'to' and 'via' supported): %d\n", unsupportedRestrictionRoles)
+
+	expandedGraph = mg
 
 	return expandedGraph, nil
 }

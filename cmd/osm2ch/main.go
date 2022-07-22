@@ -118,7 +118,7 @@ func main() {
 				verticesGeoms[source] = osm2ch.GeoPoint{Lon: expEdge.Geom[0].Lon, Lat: expEdge.Geom[0].Lat}
 			}
 			if _, ok := verticesGeoms[target]; !ok {
-				verticesGeoms[target] = osm2ch.GeoPoint{Lon: expEdge.Geom[2].Lon, Lat: expEdge.Geom[2].Lat}
+				verticesGeoms[target] = osm2ch.GeoPoint{Lon: expEdge.Geom[1].Lon, Lat: expEdge.Geom[1].Lat}
 			}
 
 			geomStr := ""
