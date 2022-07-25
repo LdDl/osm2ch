@@ -119,7 +119,6 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 						for i := 1; i < len(ns); i++ {
 							source := int64(ns[i-1].ID)
 							target := int64(ns[i].ID)
-
 							a := nodes[source]
 							b := nodes[target]
 							cost += greatCircleDistance(a, b) // kilometers
@@ -129,12 +128,16 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 								newEdges[source] = make(map[int64]expandedEdge)
 							}
 						}
-						a := nodes[s]
-						b := nodes[t]
+						geom := make([]GeoPoint, 0, len(ns))
+						for i := 0; i < len(ns); i++ {
+							source := int64(ns[i].ID)
+							a := nodes[source]
+							geom = append(geom, GeoPoint{Lat: a.Lat, Lon: a.Lon})
+						}
 						newEdges[s][t] = expandedEdge{
 							ID:        newEdgeID,
 							Cost:      cost,
-							Geom:      []GeoPoint{a, b},
+							Geom:      geom,
 							WasOneWay: true,
 						}
 						newEdgeID++
