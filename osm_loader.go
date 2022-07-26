@@ -66,7 +66,6 @@ type expandedEdge struct {
 type ExpandedGraph map[int64]map[int64]expandedEdge
 
 type Edge struct {
-	ID     int64
 	WayID  int64
 	Source osm.NodeID
 	Target osm.NodeID
@@ -287,7 +286,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	st = time.Now()
 	edges := []Edge{}
 	onewayEdges := 0
-	totalEdgesNum := int64(0)
+	totalEdgesNum := 0
 	for _, way := range ways {
 		var source osm.NodeID
 		geometry := []GeoPoint{}
@@ -299,26 +298,17 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 			} else {
 				geometry = append(geometry, GeoPoint{Lon: node.node.Lon, Lat: node.node.Lat})
 				if node.useCount > 1 {
-					totalEdgesNum++
 					edges = append(edges, Edge{
-						ID:     totalEdgesNum,
 						WayID:  way.ID,
 						Source: source,
 						Target: wayNode.ID,
 						Geom:   geometry,
 						Oneway: way.Oneway,
 					})
+					totalEdgesNum++
 					onewayEdges++
 					if !way.Oneway {
 						totalEdgesNum++
-						edges = append(edges, Edge{
-							ID:     totalEdgesNum,
-							WayID:  way.ID,
-							Source: wayNode.ID,
-							Target: source,
-							Geom:   reverseLine(geometry),
-							Oneway: false,
-						})
 					}
 					source = wayNode.ID
 					geometry = []GeoPoint{GeoPoint{Lon: node.node.Lon, Lat: node.node.Lat}}
@@ -326,7 +316,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 			}
 		}
 	}
-	fmt.Printf("Done in %v\n\tEdges: (oneway = %d), (not oneway = %d)\n", time.Since(st), onewayEdges, totalEdgesNum)
+	fmt.Printf("Done in %v\n\tEdges: (oneway = %d), (not oneway = %d)\n", time.Since(st), len(edges), totalEdgesNum)
 
 	fmt.Printf("Preparing nodes...")
 	st = time.Now()
@@ -338,17 +328,10 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	}
 	fmt.Printf("Done in %v\n\tNodes: %d\n", time.Since(st), len(nodesFiltered))
 
-	// @todo: work with maneuvers (restrictions)
-	fmt.Printf("Working with maneuvers (restrictions)...")
-	st = time.Now()
-	immposibleRestrictions := 0
-	fmt.Printf("Done in %v\n", time.Since(st))
-	fmt.Printf("\tNot properly handeled restrictions: %d\n", immposibleRestrictions)
-
-	// @todo: expand
+	// @todo: scan maneuvers (restrictions)
 	fmt.Println("Applying edge expanding technique...")
 	expandedGraph := make(ExpandedGraph)
-
+	// @todo: expand
 	return expandedGraph, nil
 }
 
@@ -388,25 +371,6 @@ func middlePoint(p, q GeoPoint) GeoPoint {
 	latMid := math.Atan2(math.Sin(lat1)+math.Sin(lat2), math.Sqrt((math.Cos(lat1)+Bx)*(math.Cos(lat1)+Bx)+By*By))
 	lonMid := lon1 + math.Atan2(By, math.Cos(lat1)+Bx)
 	return GeoPoint{Lat: radiansTodegrees(latMid), Lon: radiansTodegrees(lonMid)}
-}
-
-func reverseLine(pts []GeoPoint) []GeoPoint {
-	inputLen := len(pts)
-	output := make([]GeoPoint, inputLen)
-	for i, n := range pts {
-		j := inputLen - i - 1
-		output[j] = n
-	}
-	return output
-}
-
-func reverseLineInPlace(pts []GeoPoint) {
-	inputLen := len(pts)
-	inputMid := inputLen / 2
-	for i := 0; i < inputMid; i++ {
-		j := inputLen - i - 1
-		pts[i], pts[j] = pts[j], pts[i]
-	}
 }
 
 // PrepareWKTLinestring Creates WKT LineString from set of points
