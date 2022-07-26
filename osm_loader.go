@@ -67,13 +67,22 @@ type ExpandedGraph map[int64]map[int64]expandedEdge
 
 type preExpandedGraph map[osm.NodeID]map[osm.NodeID]Edge
 
+type EdgeID int64
+
 type Edge struct {
-	ID        int64
+	ID        EdgeID
 	WayID     osm.WayID
 	Source    osm.NodeID
 	Target    osm.NodeID
 	WasOneway bool
 	Geom      []GeoPoint
+}
+
+type ExpandedEdge struct {
+	ID     int64
+	Source EdgeID
+	Target EdgeID
+	Geom   []GeoPoint
 }
 
 // ImportFromOSMFile Imports graph from file of PBF-format (in OSM terms)
@@ -289,6 +298,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	st = time.Now()
 	edges := []Edge{}
 	onewayEdges := 0
+	notOnewayEdges := 0
 	totalEdgesNum := int64(0)
 	for _, way := range ways {
 		var source osm.NodeID
@@ -304,7 +314,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					totalEdgesNum++
 					onewayEdges++
 					edges = append(edges, Edge{
-						ID:        totalEdgesNum,
+						ID:        EdgeID(totalEdgesNum),
 						WayID:     way.ID,
 						Source:    source,
 						Target:    wayNode.ID,
@@ -313,8 +323,9 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					})
 					if !way.Oneway {
 						totalEdgesNum++
+						notOnewayEdges++
 						edges = append(edges, Edge{
-							ID:        totalEdgesNum,
+							ID:        EdgeID(totalEdgesNum),
 							WayID:     way.ID,
 							Source:    wayNode.ID,
 							Target:    source,
@@ -328,7 +339,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 			}
 		}
 	}
-	fmt.Printf("Done in %v\n\tEdges: (oneway = %d), (not oneway = %d)\n", time.Since(st), onewayEdges, totalEdgesNum)
+	fmt.Printf("Done in %v\n\tEdges: (oneway = %d), (not oneway = %d) (total = %d)\n", time.Since(st), onewayEdges, notOnewayEdges, totalEdgesNum)
 
 	fmt.Printf("Preparing nodes...")
 	st = time.Now()
@@ -348,8 +359,54 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	fmt.Printf("\tNot properly handeled restrictions: %d\n", immposibleRestrictions)
 
 	// @todo: expand
-	fmt.Println("Applying edge expanding technique...")
+	fmt.Printf("Applying edge expanding technique...")
+	st = time.Now()
 	expandedGraph := make(ExpandedGraph)
+	cycles := 0
+	expandedEdges := []ExpandedEdge{}
+	expandedEdgesTotal := int64(0)
+	for _, edge := range edges {
+		edgeAsFromVertex := edge
+		outcomingEdges := findOutComingEdges(edgeAsFromVertex, edges)
+		for _, outcomingEdge := range outcomingEdges {
+			edgeAsToVertex := edges[outcomingEdge-1] // We assuming that EdgeID == (SliceIndex + 1) which is equivalent to SliceIndex == (EdgeID - 1)
+			// cycles, u-turn?
+			// @todo: some of those are deadend (or 'boundary') edges
+			if edgeAsFromVertex.Geom[0] == edgeAsToVertex.Geom[len(edgeAsToVertex.Geom)-1] && edgeAsFromVertex.Geom[len(edgeAsFromVertex.Geom)-1] == edgeAsToVertex.Geom[0] {
+				// fmt.Println(PrepareGeoJSONLinestring(edgeAsFromVertex.Geom))
+				cycles++
+				continue
+			}
+			expandedEdgesTotal++
+			// @todo: remove debug print :D
+			// fmt.Println()
+			// fmt.Println(edgeAsFromVertex)
+			// fmt.Println(edgeAsToVertex)
+			// fmt.Println(PrepareGeoJSONLinestring(edgeAsFromVertex.Geom))
+			// fmt.Println(PrepareGeoJSONLinestring(edgeAsToVertex.Geom))
+			beforeFromIdx, fromMiddlePoint := findMiddlePoint(edgeAsFromVertex.Geom)
+			fromGeomHalf := append([]GeoPoint{fromMiddlePoint}, edgeAsFromVertex.Geom[beforeFromIdx+1:len(edgeAsFromVertex.Geom)]...)
+			beforeToIdx, toMiddlePoint := findMiddlePoint(edgeAsToVertex.Geom)
+			// toGeomHalf := append(edgeAsToVertex.Geom[:beforeToIdx+1], toMiddlePoint) // that's big mistake due the nature of slicing
+			toGeomHalf := append(make([]GeoPoint, 0, len(edgeAsToVertex.Geom[:beforeToIdx+1])+1), edgeAsToVertex.Geom[:beforeToIdx+1]...)
+			toGeomHalf = append(toGeomHalf, toMiddlePoint)
+			completedNewGeom := append(fromGeomHalf, toGeomHalf...)
+			expandedEdges = append(expandedEdges, ExpandedEdge{
+				ID:     expandedEdgesTotal,
+				Source: edgeAsFromVertex.ID,
+				Target: edgeAsToVertex.ID,
+				Geom:   completedNewGeom,
+			})
+			// fmt.Println(PrepareGeoJSONPoint(fromMiddlePoint))
+			// fmt.Println(PrepareGeoJSONPoint(toMiddlePoint))
+			// fmt.Println(PrepareGeoJSONLinestring(fromGeomHalf))
+			// fmt.Println(PrepareGeoJSONLinestring(toGeomHalf))
+			// fmt.Println(PrepareGeoJSONLinestring(completedNewGeom))
+		}
+	}
+	fmt.Printf("Done in %v\n", time.Since(st))
+	fmt.Printf("\tIgnored cycles: %d\n", cycles)
+	fmt.Printf("\tNumber of expanded edges: %d\n", expandedEdgesTotal)
 
 	return expandedGraph, nil
 }
@@ -510,10 +567,20 @@ func reverseLineInPlace(pts []GeoPoint) {
 	}
 }
 
-func findEdgesBySource(edges []Edge, sourceID osm.NodeID) []int64 {
-	result := []int64{}
+func findEdgesBySource(edges []Edge, sourceID osm.NodeID) []EdgeID {
+	result := []EdgeID{}
 	for _, edge := range edges {
 		if edge.Source == sourceID {
+			result = append(result, edge.ID)
+		}
+	}
+	return result
+}
+
+func findOutComingEdges(givenEdge Edge, edges []Edge) []EdgeID {
+	result := []EdgeID{}
+	for _, edge := range edges {
+		if edge.Source == givenEdge.Target && edge.ID != givenEdge.ID {
 			result = append(result, edge.ID)
 		}
 	}
