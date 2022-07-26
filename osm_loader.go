@@ -303,7 +303,16 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 				if node.useCount > 1 {
 					totalEdgesNum++
 					onewayEdges++
+					edges = append(edges, Edge{
+						ID:        totalEdgesNum,
+						WayID:     way.ID,
+						Source:    source,
+						Target:    wayNode.ID,
+						Geom:      geometry,
+						WasOneway: way.Oneway,
+					})
 					if !way.Oneway {
+						totalEdgesNum++
 						edges = append(edges, Edge{
 							ID:        totalEdgesNum,
 							WayID:     way.ID,
@@ -311,16 +320,6 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 							Target:    source,
 							Geom:      reverseLine(geometry),
 							WasOneway: false,
-						})
-						totalEdgesNum++
-					} else {
-						edges = append(edges, Edge{
-							ID:        totalEdgesNum,
-							WayID:     way.ID,
-							Source:    source,
-							Target:    wayNode.ID,
-							Geom:      geometry,
-							WasOneway: true,
 						})
 					}
 					source = wayNode.ID
@@ -379,6 +378,17 @@ func greatCircleDistance(p, q GeoPoint) float64 {
 	return ans
 }
 
+// getShericalLength returns length for given line (kilometers)
+func getShericalLength(line []GeoPoint) float64 {
+	totalLength := 0.0
+	if len(line) < 2 {
+		return totalLength
+	}
+	for i := 1; i < len(line); i++ {
+		totalLength += greatCircleDistance(line[i-1], line[i])
+	}
+	return totalLength
+}
 func middlePoint(p, q GeoPoint) GeoPoint {
 	lat1 := degreesToRadians(p.Lat)
 	lon1 := degreesToRadians(p.Lon)
@@ -391,6 +401,94 @@ func middlePoint(p, q GeoPoint) GeoPoint {
 	latMid := math.Atan2(math.Sin(lat1)+math.Sin(lat2), math.Sqrt((math.Cos(lat1)+Bx)*(math.Cos(lat1)+Bx)+By*By))
 	lonMid := lon1 + math.Atan2(By, math.Cos(lat1)+Bx)
 	return GeoPoint{Lat: radiansTodegrees(latMid), Lon: radiansTodegrees(lonMid)}
+}
+
+// findCentroid returns center point for given line (not middle point)
+func findCentroid(line []GeoPoint) GeoPoint {
+	totalPoints := len(line)
+	if totalPoints == 1 {
+		return line[0]
+	}
+	x, y, z := 0.0, 0.0, 0.0
+	for i := 0; i < totalPoints; i++ {
+		longitude := degreesToRadians(line[i].Lon)
+		latitude := degreesToRadians(line[i].Lat)
+		c1 := math.Cos(latitude)
+		x += c1 * math.Cos(longitude)
+		y += c1 * math.Sin(longitude)
+		z += math.Sin(latitude)
+	}
+
+	x /= float64(totalPoints)
+	y /= float64(totalPoints)
+	z /= float64(totalPoints)
+
+	centralLongitude := math.Atan2(y, x)
+	centralSquareRoot := math.Sqrt(x*x + y*y)
+	centralLatitude := math.Atan2(z, centralSquareRoot)
+
+	return GeoPoint{
+		Lon: radiansTodegrees(centralLongitude),
+		Lat: radiansTodegrees(centralLatitude),
+	}
+}
+
+// findDistance returns distance between two points (assuming they are Euclidean: Lon == X, Lat == Y)
+func findDistance(p, q GeoPoint) float64 {
+	xdistance := p.Lon - q.Lon
+	ydistance := p.Lat - q.Lat
+	return math.Sqrt(xdistance*xdistance + ydistance*ydistance)
+}
+
+// getLength returns length for given line  (assuming points of the line are Euclidean: Lon == X, Lat == Y)
+func getLength(line []GeoPoint) float64 {
+	totalLength := 0.0
+	if len(line) < 2 {
+		return totalLength
+	}
+	for i := 1; i < len(line); i++ {
+		totalLength += findDistance(line[i-1], line[i])
+	}
+	return totalLength
+}
+
+// findMiddlePoint returns middle point for give line (not center point) and index of point in line right before middle one
+// Purpose of returning index of point in line right before middle point is to give the ability to split line in a half
+func findMiddlePoint(line []GeoPoint) (int, GeoPoint) {
+	euclideanLength := getLength(line)
+	halfDistance := euclideanLength / 2.0
+	cl := 0.0
+	ol := 0.0
+	var result GeoPoint
+	var idx int
+	for i := 1; i < len(line); i++ {
+		ol = cl
+		tmpDist := findDistance(line[i-1], line[i])
+		cl += tmpDist
+		if halfDistance <= cl && halfDistance > ol {
+			halfSub := halfDistance - ol
+			result = pointOnSegmentByFraction(line[i-1], line[i], halfSub/tmpDist, halfSub)
+			idx = i - 1
+		}
+	}
+	return idx, result
+}
+
+// pointOnSegment returns a point on given segment using distance
+func pointOnSegment(p, q GeoPoint, distance float64) GeoPoint {
+	fraction := distance / findDistance(p, q)
+	return GeoPoint{
+		Lon: (1-fraction)*p.Lon + (fraction * q.Lon),
+		Lat: (1-fraction)*p.Lat + (fraction * q.Lat),
+	}
+}
+
+// pointOnSegmentByFraction returns a point on given segment using distance assuming knowledge about fraction
+func pointOnSegmentByFraction(p, q GeoPoint, fraction, distance float64) GeoPoint {
+	return GeoPoint{
+		Lon: (1-fraction)*p.Lon + (fraction * q.Lon),
+		Lat: (1-fraction)*p.Lat + (fraction * q.Lat),
+	}
 }
 
 func reverseLine(pts []GeoPoint) []GeoPoint {
@@ -410,6 +508,16 @@ func reverseLineInPlace(pts []GeoPoint) {
 		j := inputLen - i - 1
 		pts[i], pts[j] = pts[j], pts[i]
 	}
+}
+
+func findEdgesBySource(edges []Edge, sourceID osm.NodeID) []int64 {
+	result := []int64{}
+	for _, edge := range edges {
+		if edge.Source == sourceID {
+			result = append(result, edge.ID)
+		}
+	}
+	return result
 }
 
 // PrepareWKTLinestring Creates WKT LineString from set of points
