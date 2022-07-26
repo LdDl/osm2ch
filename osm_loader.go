@@ -135,7 +135,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	// Seek file to start
 	_, err = f.Seek(0, io.SeekStart)
 	if err != nil {
-		return nil, errors.Wrap(err, "Can't repeat seeking")
+		return nil, errors.Wrap(err, "Can't repeat seeking after ways scanning")
 	}
 	scannerNodes := osmpbf.New(context.Background(), f, 4)
 	defer scannerNodes.Close()
@@ -163,6 +163,105 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	fmt.Printf("Done in %v\n\tNodes: %d\n", time.Since(st), len(nodes))
 
 	// @todo: scan maneuvers (restrictions)
+	// Seek file to start
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't repeat seeking after nodes scanning")
+	}
+	scannerManeuvers := osmpbf.New(context.Background(), f, 4)
+	defer scannerManeuvers.Close()
+	fmt.Printf("Scanning maneuvers (restrictions)...")
+	st = time.Now()
+	skippedRestrictions := 0
+	unsupportedRestrictionRoles := 0
+	possibleRestrictionCombos := make(map[string]map[string]bool)
+	restrictions := make(map[string]map[restrictionComponent]map[restrictionComponent]restrictionComponent)
+	for scannerNodes.Scan() {
+		obj := scannerNodes.Object()
+		if obj.ObjectID().Type() == "relation" {
+			relation := obj.(*osm.Relation)
+			tagMap := relation.TagMap()
+			tag, ok := tagMap["restriction"]
+			if !ok {
+				continue
+			}
+			_ = tag
+			members := relation.Members
+			if len(members) != 3 {
+				skippedRestrictions++
+				// fmt.Printf("Restriction does not contain 3 members, relation ID: %d. Skip it\n", relation.ID)
+				continue
+			}
+			firstMember := restrictionComponent{-1, ""}
+			secondMember := restrictionComponent{-1, ""}
+			thirdMember := restrictionComponent{-1, ""}
+
+			switch members[0].Role {
+			case "from":
+				firstMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
+				break
+			case "via":
+				thirdMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
+				break
+			case "to":
+				secondMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
+				break
+			default:
+				unsupportedRestrictionRoles++
+				// fmt.Printf("Something went wrong for first member of relation with ID: %d\n", relation.ID)
+				break
+			}
+
+			switch members[1].Role {
+			case "from":
+				firstMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
+				break
+			case "via":
+				thirdMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
+				break
+			case "to":
+				secondMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
+				break
+			default:
+				unsupportedRestrictionRoles++
+				// fmt.Printf("Something went wrong for second member of relation with ID: %d\n", relation.ID)
+				break
+			}
+
+			switch members[2].Role {
+			case "from":
+				firstMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
+				break
+			case "via":
+				thirdMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
+				break
+			case "to":
+				secondMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
+				break
+			default:
+				unsupportedRestrictionRoles++
+				// fmt.Printf("Something went wrong for third member of relation with ID: %d\n", relation.ID)
+				break
+			}
+			if _, ok := possibleRestrictionCombos[tag]; !ok {
+				possibleRestrictionCombos[tag] = make(map[string]bool)
+			}
+			possibleRestrictionCombos[tag][fmt.Sprintf("%s;%s;%s", firstMember.Type, secondMember.Type, thirdMember.Type)] = true
+
+			if _, ok := restrictions[tag]; !ok {
+				restrictions[tag] = make(map[restrictionComponent]map[restrictionComponent]restrictionComponent)
+			}
+			if _, ok := restrictions[tag][firstMember]; !ok {
+				restrictions[tag][firstMember] = make(map[restrictionComponent]restrictionComponent)
+			}
+			if _, ok := restrictions[tag][firstMember][secondMember]; !ok {
+				restrictions[tag][firstMember][secondMember] = thirdMember
+			}
+		}
+	}
+	fmt.Printf("Done in %v\n", time.Since(st))
+	fmt.Printf("\tSkipped restrictions (which have not exactly 3 members): %d\n", skippedRestrictions)
+	fmt.Printf("\tNumber of unknow restriction roles (only 'from', 'to' and 'via' supported): %d\n", unsupportedRestrictionRoles)
 
 	fmt.Printf("Counting node use cases...")
 	st = time.Now()
