@@ -66,12 +66,12 @@ type expandedEdge struct {
 type ExpandedGraph map[int64]map[int64]expandedEdge
 
 type Edge struct {
-	ID     int64
-	WayID  int64
-	Source osm.NodeID
-	Target osm.NodeID
-	Oneway bool
-	Geom   []GeoPoint
+	ID        int64
+	WayID     osm.WayID
+	Source    osm.NodeID
+	Target    osm.NodeID
+	WasOneway bool
+	Geom      []GeoPoint
 }
 
 // ImportFromOSMFile Imports graph from file of PBF-format (in OSM terms)
@@ -116,7 +116,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 		}
 		nodes := way.Nodes
 		preparedWay := Way{
-			ID:     int64(way.ID),
+			ID:     way.ID,
 			Nodes:  make(osm.WayNodes, len(nodes)),
 			Oneway: oneway,
 			TagMap: make(osm.Tags, len(way.Tags)),
@@ -300,24 +300,25 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 				geometry = append(geometry, GeoPoint{Lon: node.node.Lon, Lat: node.node.Lat})
 				if node.useCount > 1 {
 					totalEdgesNum++
-					edges = append(edges, Edge{
-						ID:     totalEdgesNum,
-						WayID:  way.ID,
-						Source: source,
-						Target: wayNode.ID,
-						Geom:   geometry,
-						Oneway: way.Oneway,
-					})
 					onewayEdges++
 					if !way.Oneway {
 						totalEdgesNum++
 						edges = append(edges, Edge{
-							ID:     totalEdgesNum,
-							WayID:  way.ID,
-							Source: wayNode.ID,
-							Target: source,
-							Geom:   reverseLine(geometry),
-							Oneway: false,
+							ID:        totalEdgesNum,
+							WayID:     way.ID,
+							Source:    wayNode.ID,
+							Target:    source,
+							Geom:      reverseLine(geometry),
+							WasOneway: false,
+						})
+					} else {
+						edges = append(edges, Edge{
+							ID:        totalEdgesNum,
+							WayID:     way.ID,
+							Source:    source,
+							Target:    wayNode.ID,
+							Geom:      geometry,
+							WasOneway: true,
 						})
 					}
 					source = wayNode.ID

@@ -5,7 +5,7 @@ import (
 )
 
 type Way struct {
-	ID     int64
+	ID     osm.WayID
 	Oneway bool
 	Nodes  osm.WayNodes
 	TagMap osm.Tags
