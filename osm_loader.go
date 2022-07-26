@@ -65,6 +65,8 @@ type expandedEdge struct {
 */
 type ExpandedGraph map[int64]map[int64]expandedEdge
 
+type preExpandedGraph map[osm.NodeID]map[osm.NodeID]Edge
+
 type Edge struct {
 	ID        int64
 	WayID     osm.WayID
@@ -302,7 +304,6 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					totalEdgesNum++
 					onewayEdges++
 					if !way.Oneway {
-						totalEdgesNum++
 						edges = append(edges, Edge{
 							ID:        totalEdgesNum,
 							WayID:     way.ID,
@@ -311,6 +312,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 							Geom:      reverseLine(geometry),
 							WasOneway: false,
 						})
+						totalEdgesNum++
 					} else {
 						edges = append(edges, Edge{
 							ID:        totalEdgesNum,
