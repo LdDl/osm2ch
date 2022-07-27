@@ -2,6 +2,7 @@ package osm2ch
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"math"
@@ -79,10 +80,12 @@ type Edge struct {
 }
 
 type ExpandedEdge struct {
-	ID     int64
-	Source EdgeID
-	Target EdgeID
-	Geom   []GeoPoint
+	ID             int64
+	Source         EdgeID
+	Target         EdgeID
+	SourceOSMWayID osm.WayID
+	TargetOSMWayID osm.WayID
+	Geom           []GeoPoint
 }
 
 // ImportFromOSMFile Imports graph from file of PBF-format (in OSM terms)
@@ -188,8 +191,8 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	unsupportedRestrictionRoles := 0
 	possibleRestrictionCombos := make(map[string]map[string]bool)
 	restrictions := make(map[string]map[restrictionComponent]map[restrictionComponent]restrictionComponent)
-	for scannerNodes.Scan() {
-		obj := scannerNodes.Object()
+	for scannerManeuvers.Scan() {
+		obj := scannerManeuvers.Object()
 		if obj.ObjectID().Type() == "relation" {
 			relation := obj.(*osm.Relation)
 			tagMap := relation.TagMap()
@@ -300,8 +303,10 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	onewayEdges := 0
 	notOnewayEdges := 0
 	totalEdgesNum := int64(0)
+	waysSeen := make(map[osm.WayID]struct{})
 	for _, way := range ways {
 		var source osm.NodeID
+		waysSeen[way.ID] = struct{}{}
 		geometry := []GeoPoint{}
 		for i, wayNode := range way.Nodes {
 			node := nodes[wayNode.ID]
@@ -392,10 +397,12 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 			toGeomHalf = append(toGeomHalf, toMiddlePoint)
 			completedNewGeom := append(fromGeomHalf, toGeomHalf...)
 			expandedEdges = append(expandedEdges, ExpandedEdge{
-				ID:     expandedEdgesTotal,
-				Source: edgeAsFromVertex.ID,
-				Target: edgeAsToVertex.ID,
-				Geom:   completedNewGeom,
+				ID:             expandedEdgesTotal,
+				Source:         edgeAsFromVertex.ID,
+				Target:         edgeAsToVertex.ID,
+				SourceOSMWayID: edgeAsFromVertex.WayID,
+				TargetOSMWayID: edgeAsToVertex.WayID,
+				Geom:           completedNewGeom,
 			})
 			// fmt.Println(PrepareGeoJSONPoint(fromMiddlePoint))
 			// fmt.Println(PrepareGeoJSONPoint(toMiddlePoint))
@@ -408,6 +415,93 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	fmt.Printf("\tIgnored cycles: %d\n", cycles)
 	fmt.Printf("\tNumber of expanded edges: %d\n", expandedEdgesTotal)
 
+	// Handling restrictions of "no" type
+	for i, k := range restrictions {
+		switch i {
+		case "no_left_turn", "no_right_turn", "no_straight_on":
+			// handle only way(from)-way(to)-node(via)
+			fmt.Println(i)
+			for j, v := range k {
+				if j.Type != "way" { // way(from)
+					continue
+				}
+				fromOSMWayID := osm.WayID(j.ID)
+				if _, ok := waysSeen[fromOSMWayID]; !ok {
+					fmt.Println(j.ID)
+					continue
+				}
+				for n := range v {
+					if n.Type != "way" { // way(to)
+						continue
+					}
+					if v[n].Type != "node" { // node(via)
+						continue
+					}
+					toOSMWayID := osm.WayID(n.ID)
+					if _, ok := waysSeen[toOSMWayID]; !ok {
+						continue
+					}
+					rvertexVia := v[n].ID
+					if rvertexVia == 926163261 {
+						fmt.Println("\t", rvertexVia, fromOSMWayID, toOSMWayID)
+						// Delete restricted expanded edge
+						{
+							temp := expandedEdges[:0]
+							for _, expEdge := range expandedEdges {
+								// if expEdge.SourceOSMWayID == source && expEdge.TargetOSMWayID == target {
+								if expEdge.SourceOSMWayID != fromOSMWayID || expEdge.TargetOSMWayID != toOSMWayID {
+									temp = append(temp, expEdge)
+								}
+							}
+							expandedEdges = temp
+						}
+					}
+				}
+			}
+			break
+		default:
+			// @todo: need to think about U-turns: "no_u_turn"
+			break
+		}
+	}
+	fileExpandedEdges, err := os.Create("exp_edges_osm2ch.csv")
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer fileExpandedEdges.Close()
+	writerExpandedEdges := csv.NewWriter(fileExpandedEdges)
+	defer writerExpandedEdges.Flush()
+	writerExpandedEdges.Comma = ';'
+	err = writerExpandedEdges.Write([]string{"id", "from", "to", "osm_way_id_from", "osm_way_id_to", "geom"})
+	if err != nil {
+		fmt.Println(err)
+	}
+	for _, expEdge := range expandedEdges {
+		geomStr := PrepareWKTLinestring(expEdge.Geom)
+		err = writerExpandedEdges.Write([]string{fmt.Sprintf("%d", expEdge.ID), fmt.Sprintf("%d", expEdge.Source), fmt.Sprintf("%d", expEdge.Target), fmt.Sprintf("%d", expEdge.SourceOSMWayID), fmt.Sprintf("%d", expEdge.TargetOSMWayID), geomStr})
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	fileEdges, err := os.Create("edges_osm2ch.csv")
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer fileEdges.Close()
+	writerEdges := csv.NewWriter(fileEdges)
+	defer writerEdges.Flush()
+	writerEdges.Comma = ';'
+	err = writerEdges.Write([]string{"way_id", "from_vertex_id", "to_vertex_id", "oneway", "geom"})
+	if err != nil {
+		fmt.Println(err)
+	}
+	for _, edge := range edges {
+		geomStr := PrepareWKTLinestring(edge.Geom)
+		err = writerEdges.Write([]string{fmt.Sprintf("%d", edge.WayID), fmt.Sprintf("%d", edge.Source), fmt.Sprintf("%d", edge.Target), fmt.Sprintf("%t", edge.WasOneway), geomStr})
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
 	return expandedGraph, nil
 }
 
