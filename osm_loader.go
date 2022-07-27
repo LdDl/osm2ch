@@ -356,13 +356,6 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	}
 	fmt.Printf("Done in %v\n\tNodes: %d\n", time.Since(st), len(nodesFiltered))
 
-	// @todo: work with maneuvers (restrictions)
-	fmt.Printf("Working with maneuvers (restrictions)...")
-	st = time.Now()
-	immposibleRestrictions := 0
-	fmt.Printf("Done in %v\n", time.Since(st))
-	fmt.Printf("\tNot properly handeled restrictions: %d\n", immposibleRestrictions)
-
 	// @todo: expand
 	fmt.Printf("Applying edge expanding technique...")
 	st = time.Now()
@@ -415,19 +408,21 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	fmt.Printf("\tIgnored cycles: %d\n", cycles)
 	fmt.Printf("\tNumber of expanded edges: %d\n", expandedEdgesTotal)
 
+	// @todo: work with maneuvers (restrictions)
+	fmt.Printf("Working with maneuvers (restrictions)...")
+	st = time.Now()
+	immposibleRestrictions := 0
 	// Handling restrictions of "no" type
 	for i, k := range restrictions {
 		switch i {
 		case "no_left_turn", "no_right_turn", "no_straight_on":
 			// handle only way(from)-way(to)-node(via)
-			fmt.Println(i)
 			for j, v := range k {
 				if j.Type != "way" { // way(from)
 					continue
 				}
 				fromOSMWayID := osm.WayID(j.ID)
 				if _, ok := waysSeen[fromOSMWayID]; !ok {
-					fmt.Println(j.ID)
 					continue
 				}
 				for n := range v {
@@ -441,20 +436,19 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					if _, ok := waysSeen[toOSMWayID]; !ok {
 						continue
 					}
-					rvertexVia := v[n].ID
-					if rvertexVia == 926163261 {
-						fmt.Println("\t", rvertexVia, fromOSMWayID, toOSMWayID)
-						// Delete restricted expanded edge
-						{
-							temp := expandedEdges[:0]
-							for _, expEdge := range expandedEdges {
-								// if expEdge.SourceOSMWayID == source && expEdge.TargetOSMWayID == target {
-								if expEdge.SourceOSMWayID != fromOSMWayID || expEdge.TargetOSMWayID != toOSMWayID {
-									temp = append(temp, expEdge)
-								}
+					// rvertexVia := v[n].ID
+					// Delete restricted expanded edge
+					{
+						temp := expandedEdges[:0]
+						for _, expEdge := range expandedEdges {
+							// if expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID == toOSMWayID {
+							// 	fmt.Println(expEdge.ID)
+							// }
+							if expEdge.SourceOSMWayID != fromOSMWayID || expEdge.TargetOSMWayID != toOSMWayID {
+								temp = append(temp, expEdge)
 							}
-							expandedEdges = temp
 						}
+						expandedEdges = temp
 					}
 				}
 			}
@@ -464,7 +458,11 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 			break
 		}
 	}
-	fileExpandedEdges, err := os.Create("exp_edges_osm2ch.csv")
+	fmt.Printf("Done in %v\n", time.Since(st))
+	fmt.Printf("\tNot properly handeled restrictions: %d\n", immposibleRestrictions)
+	fmt.Printf("\tUpdated of expanded edges: %d\n", len(expandedEdges))
+
+	fileExpandedEdges, err := os.Create("exp_edges_osm2ch-res.csv")
 	if err != nil {
 		fmt.Println(err)
 	}
