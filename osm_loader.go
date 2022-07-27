@@ -498,18 +498,16 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					rvertexVia := v[n].ID
 					// if rvertexVia == 3832596114 {
 					// fmt.Println()
-					// fmt.Println("found", i, rvertexVia, fromOSMWayID, toOSMWayID)
+					fmt.Printf("Restriction type: %s, Via: %d, From OSM Way: %d, To OSM Way: %d\n", i, rvertexVia, fromOSMWayID, toOSMWayID)
 					// Save only allowed expanded edge and delete others
 					{
 						temp := expandedEdges[:0]
 						for _, expEdge := range expandedEdges {
-							// if expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID == toOSMWayID {
-							// 	fmt.Println("\t\t edge to keep", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
-							// }
 							if expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID != toOSMWayID {
 								if expEdge.SourceComponent.TargetNodeID == osm.NodeID(rvertexVia) {
-									// fmt.Println(expEdge.ID)
-									// fmt.Println("\t\t edge to delete", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
+									fmt.Printf("\t\tEdge to delete: %d, From OSM Way: %d, To OSM Way: %d, FromEdge: %d, ToEdge:%d, FromSourceComponent:%v ToSourceComponent:%v\n", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
+								} else {
+									fmt.Printf("\t\tEdge NOT delete (no Via as target in source component): %d, From OSM Way: %d, To OSM Way: %d, FromEdge: %d, ToEdge:%d, FromSourceComponent:%v ToSourceComponent:%v\n", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
 								}
 							}
 							if !(expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID != toOSMWayID && expEdge.SourceComponent.TargetNodeID == osm.NodeID(rvertexVia)) {
