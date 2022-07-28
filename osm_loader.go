@@ -184,7 +184,6 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 	}
 	fmt.Printf("Done in %v\n\tNodes: %d\n", time.Since(st), len(nodes))
 
-	// @todo: scan maneuvers (restrictions)
 	// Seek file to start
 	_, err = f.Seek(0, io.SeekStart)
 	if err != nil {
@@ -207,7 +206,6 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 			if !ok {
 				continue
 			}
-			_ = tag
 			members := relation.Members
 			if len(members) != 3 {
 				skippedRestrictions++
@@ -499,18 +497,18 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 					rvertexVia := v[n].ID
 					// if rvertexVia == 3832596114 {
 					// fmt.Println()
-					fmt.Printf("Restriction type: %s, Via: %d, From OSM Way: %d, To OSM Way: %d\n", i, rvertexVia, fromOSMWayID, toOSMWayID)
+					// fmt.Printf("Restriction type: %s, Via: %d, From OSM Way: %d, To OSM Way: %d\n", i, rvertexVia, fromOSMWayID, toOSMWayID)
 					// Save only allowed expanded edge and delete others
 					{
 						temp := expandedEdges[:0]
 						for _, expEdge := range expandedEdges {
-							if expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID != toOSMWayID {
-								if expEdge.SourceComponent.TargetNodeID == osm.NodeID(rvertexVia) {
-									fmt.Printf("\t\tEdge to delete: %d, From OSM Way: %d, To OSM Way: %d, FromEdge: %d, ToEdge:%d, FromSourceComponent:%v ToSourceComponent:%v\n", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
-								} else {
-									fmt.Printf("\t\tEdge NOT delete (no Via as target in source component): %d, From OSM Way: %d, To OSM Way: %d, FromEdge: %d, ToEdge:%d, FromSourceComponent:%v ToSourceComponent:%v\n", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
-								}
-							}
+							// if expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID != toOSMWayID {
+							// 	if expEdge.SourceComponent.TargetNodeID == osm.NodeID(rvertexVia) {
+							// 		fmt.Printf("\t\tEdge to delete: %d, From OSM Way: %d, To OSM Way: %d, FromEdge: %d, ToEdge:%d, FromSourceComponent:%v ToSourceComponent:%v\n", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
+							// 	} else {
+							// 		fmt.Printf("\t\tEdge NOT delete (no Via as target in source component): %d, From OSM Way: %d, To OSM Way: %d, FromEdge: %d, ToEdge:%d, FromSourceComponent:%v ToSourceComponent:%v\n", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
+							// 	}
+							// }
 							if !(expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID != toOSMWayID && expEdge.SourceComponent.TargetNodeID == osm.NodeID(rvertexVia)) {
 								temp = append(temp, expEdge)
 							}
@@ -569,7 +567,9 @@ func getShericalLength(line []GeoPoint) float64 {
 	}
 	return totalLength
 }
-func middlePoint(p, q GeoPoint) GeoPoint {
+
+// middlePointSegment return middle point for given segment
+func middlePointSegment(p, q GeoPoint) GeoPoint {
 	lat1 := degreesToRadians(p.Lat)
 	lon1 := degreesToRadians(p.Lon)
 	lat2 := degreesToRadians(q.Lat)
@@ -671,6 +671,7 @@ func pointOnSegmentByFraction(p, q GeoPoint, fraction, distance float64) GeoPoin
 	}
 }
 
+// reverseLine reverses order of points in given line. Returns new slice
 func reverseLine(pts []GeoPoint) []GeoPoint {
 	inputLen := len(pts)
 	output := make([]GeoPoint, inputLen)
@@ -681,6 +682,7 @@ func reverseLine(pts []GeoPoint) []GeoPoint {
 	return output
 }
 
+// reverseLine reverses order of points in given line
 func reverseLineInPlace(pts []GeoPoint) {
 	inputLen := len(pts)
 	inputMid := inputLen / 2
@@ -690,16 +692,7 @@ func reverseLineInPlace(pts []GeoPoint) {
 	}
 }
 
-func findEdgesBySource(edges []Edge, sourceID osm.NodeID) []EdgeID {
-	result := []EdgeID{}
-	for _, edge := range edges {
-		if edge.SourceNodeID == sourceID {
-			result = append(result, edge.ID)
-		}
-	}
-	return result
-}
-
+// findOutComingEdges returns IDs of edges for given OSM Way object
 func findOutComingEdges(givenEdge Edge, edges []Edge) []EdgeID {
 	result := []EdgeID{}
 	for _, edge := range edges {
