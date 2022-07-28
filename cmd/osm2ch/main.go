@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -58,7 +57,7 @@ func main() {
 	// 		weight - float64, Weight of an edge
 	//      geom - geometry (WKT or GeoJSON representation)
 	//      was_one_way - if edge was one way
-	err = writerEdges.Write([]string{"from_vertex_id", "to_vertex_id", "weight", "geom", "was_one_way"})
+	err = writerEdges.Write([]string{"id", "from", "to", "osm_way_from", "osm_way_to", "weight", "geom"})
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -88,50 +87,52 @@ func main() {
 	graph := ch.Graph{}
 
 	// Prepare graph and write edges
-	for source, targets := range edgeExpandedGraph {
+	for _, edge := range edgeExpandedGraph {
+		source := int64(edge.Source)
+		target := int64(edge.Target)
 		err := graph.CreateVertex(source)
 		if err != nil {
 			err = errors.Wrap(err, "Can not create source vertex")
 			return
 		}
-		for target, expEdge := range targets {
-			err = graph.CreateVertex(target)
-			if err != nil {
-				err = errors.Wrap(err, "Can not create Target vertex")
-				return
-			}
-			cost := expEdge.Cost
-			if strings.ToLower(*units) == "m" {
-				cost *= 1000.0
-			}
-			err = graph.AddEdge(source, target, cost)
-			if err != nil {
-				err = errors.Wrap(err, "Can not wrap Source and Targed vertices as Edge")
-				return
-			}
+		err = graph.CreateVertex(target)
+		if err != nil {
+			err = errors.Wrap(err, "Can not create source vertex")
+			return
+		}
+		cost := edge.Cost
+		if strings.ToLower(*units) == "m" {
+			cost *= 1000.0
+		}
+		err = graph.AddEdge(source, target, cost)
+		if err != nil {
+			err = errors.Wrap(err, "Can not wrap Source and Targed vertices as Edge")
+			return
+		}
+		if len(edge.Geom) < 2 {
+			fmt.Println("!!")
+			// Skip bad expanded edges
+			continue
+		}
 
-			if len(expEdge.Geom) < 2 {
-				// Skip bad expanded edges
-				continue
-			}
-			if _, ok := verticesGeoms[source]; !ok {
-				verticesGeoms[source] = osm2ch.GeoPoint{Lon: expEdge.Geom[0].Lon, Lat: expEdge.Geom[0].Lat}
-			}
-			if _, ok := verticesGeoms[target]; !ok {
-				verticesGeoms[target] = osm2ch.GeoPoint{Lon: expEdge.Geom[2].Lon, Lat: expEdge.Geom[2].Lat}
-			}
+		geomStr := ""
+		if strings.ToLower(*geomFormat) == "geojson" {
+			geomStr = osm2ch.PrepareGeoJSONLinestring(edge.Geom)
+		} else {
+			geomStr = osm2ch.PrepareWKTLinestring(edge.Geom)
+		}
 
-			geomStr := ""
-			if strings.ToLower(*geomFormat) == "geojson" {
-				geomStr = osm2ch.PrepareGeoJSONLinestring(expEdge.Geom)
-			} else {
-				geomStr = osm2ch.PrepareWKTLinestring(expEdge.Geom)
-			}
-			err = writerEdges.Write([]string{fmt.Sprintf("%d", source), fmt.Sprintf("%d", target), fmt.Sprintf("%f", cost), geomStr, strconv.FormatBool(expEdge.WasOneWay)})
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+		if _, ok := verticesGeoms[source]; !ok {
+			verticesGeoms[source] = osm2ch.GeoPoint{Lon: edge.Geom[0].Lon, Lat: edge.Geom[0].Lat}
+		}
+		if _, ok := verticesGeoms[target]; !ok {
+			verticesGeoms[target] = osm2ch.GeoPoint{Lon: edge.Geom[len(edge.Geom)-1].Lon, Lat: edge.Geom[len(edge.Geom)-1].Lat}
+		}
+
+		err = writerEdges.Write([]string{fmt.Sprintf("%d", edge.ID), fmt.Sprintf("%d", source), fmt.Sprintf("%d", target), fmt.Sprintf("%d", edge.SourceOSMWayID), fmt.Sprintf("%d", edge.TargetOSMWayID), fmt.Sprintf("%f", cost), geomStr})
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
 	}
 

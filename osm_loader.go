@@ -86,6 +86,7 @@ type ExpandedEdge struct {
 	TargetOSMWayID  osm.WayID
 	SourceComponent expandedEdgeComponent
 	TargeComponent  expandedEdgeComponent
+	Cost            float64
 	Geom            []GeoPoint
 }
 
@@ -98,7 +99,7 @@ type expandedEdgeComponent struct {
 /*
 	File should have PBF (Protocolbuffer Binary Format) extension according to https://github.com/paulmach/osm
 */
-func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, error) {
+func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, error) {
 	f, err := os.Open(fileName)
 	if err != nil {
 		return nil, errors.Wrap(err, "File open")
@@ -365,7 +366,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	// @todo: expand
 	fmt.Printf("Applying edge expanding technique...")
 	st = time.Now()
-	expandedGraph := make(ExpandedGraph)
+	// expandedGraph := make(ExpandedGraph)
 	cycles := 0
 	expandedEdges := []ExpandedEdge{}
 	expandedEdgesTotal := int64(0)
@@ -530,7 +531,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 	fmt.Printf("Done in %v\n", time.Since(st))
 	fmt.Printf("\tUpdated of expanded edges: %d\n", len(expandedEdges))
 
-	return expandedGraph, nil
+	return expandedEdges, nil
 }
 
 // degreesToRadians deg = r * pi / 180
