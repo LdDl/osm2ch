@@ -26,18 +26,6 @@ func (gp GeoPoint) String() string {
 	return fmt.Sprintf("Lon: %f | Lat: %f", gp.Lon, gp.Lat)
 }
 
-// edgeComponent Representation of edge (vertex_from -> vertex_to)
-type edgeComponent struct {
-	from int64
-	to   int64
-}
-
-// wayComponent First and last edges of osm.Way
-type wayComponent struct {
-	FirstEdge edgeComponent
-	LastEdge  edgeComponent
-}
-
 // restrictionComponent Representation of member of restriction relation. Could be way or node.
 type restrictionComponent struct {
 	ID   int64
@@ -354,10 +342,8 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 	}
 	fmt.Printf("Done in %v\n\tNodes: %d\n", time.Since(st), len(nodesFiltered))
 
-	// @todo: expand
 	fmt.Printf("Applying edge expanding technique...")
 	st = time.Now()
-	// expandedGraph := make(ExpandedGraph)
 	cycles := 0
 	expandedEdges := []ExpandedEdge{}
 	expandedEdgesTotal := int64(0)
@@ -374,16 +360,9 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 				continue
 			}
 			expandedEdgesTotal++
-			// @todo: remove debug print :D
-			// fmt.Println()
-			// fmt.Println(edgeAsFromVertex)
-			// fmt.Println(edgeAsToVertex)
-			// fmt.Println(PrepareGeoJSONLinestring(edgeAsFromVertex.Geom))
-			// fmt.Println(PrepareGeoJSONLinestring(edgeAsToVertex.Geom))
 			beforeFromIdx, fromMiddlePoint := findMiddlePoint(edgeAsFromVertex.Geom)
 			fromGeomHalf := append([]GeoPoint{fromMiddlePoint}, edgeAsFromVertex.Geom[beforeFromIdx+1:len(edgeAsFromVertex.Geom)]...)
 			beforeToIdx, toMiddlePoint := findMiddlePoint(edgeAsToVertex.Geom)
-			// toGeomHalf := append(edgeAsToVertex.Geom[:beforeToIdx+1], toMiddlePoint) // that's big mistake due the nature of slicing
 			toGeomHalf := append(make([]GeoPoint, 0, len(edgeAsToVertex.Geom[:beforeToIdx+1])+1), edgeAsToVertex.Geom[:beforeToIdx+1]...)
 			toGeomHalf = append(toGeomHalf, toMiddlePoint)
 			completedNewGeom := append(fromGeomHalf, toGeomHalf...)
@@ -403,11 +382,6 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 				},
 				Geom: completedNewGeom,
 			})
-			// fmt.Println(PrepareGeoJSONPoint(fromMiddlePoint))
-			// fmt.Println(PrepareGeoJSONPoint(toMiddlePoint))
-			// fmt.Println(PrepareGeoJSONLinestring(fromGeomHalf))
-			// fmt.Println(PrepareGeoJSONLinestring(toGeomHalf))
-			// fmt.Println(PrepareGeoJSONLinestring(completedNewGeom))
 		}
 	}
 	fmt.Printf("Done in %v\n", time.Since(st))
@@ -441,14 +415,10 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 					if _, ok := waysSeen[toOSMWayID]; !ok {
 						continue
 					}
-					// rvertexVia := v[n].ID
 					// Delete restricted expanded edge
 					{
 						temp := expandedEdges[:0]
 						for _, expEdge := range expandedEdges {
-							// if expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID == toOSMWayID {
-							// 	fmt.Println(expEdge.ID)
-							// }
 							if expEdge.SourceOSMWayID != fromOSMWayID || expEdge.TargetOSMWayID != toOSMWayID {
 								temp = append(temp, expEdge)
 							}
@@ -488,27 +458,15 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 						continue
 					}
 					rvertexVia := v[n].ID
-					// if rvertexVia == 3832596114 {
-					// fmt.Println()
-					// fmt.Printf("Restriction type: %s, Via: %d, From OSM Way: %d, To OSM Way: %d\n", i, rvertexVia, fromOSMWayID, toOSMWayID)
-					// Save only allowed expanded edge and delete others
 					{
 						temp := expandedEdges[:0]
 						for _, expEdge := range expandedEdges {
-							// if expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID != toOSMWayID {
-							// 	if expEdge.SourceComponent.TargetNodeID == osm.NodeID(rvertexVia) {
-							// 		fmt.Printf("\t\tEdge to delete: %d, From OSM Way: %d, To OSM Way: %d, FromEdge: %d, ToEdge:%d, FromSourceComponent:%v ToSourceComponent:%v\n", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
-							// 	} else {
-							// 		fmt.Printf("\t\tEdge NOT delete (no Via as target in source component): %d, From OSM Way: %d, To OSM Way: %d, FromEdge: %d, ToEdge:%d, FromSourceComponent:%v ToSourceComponent:%v\n", expEdge.ID, fromOSMWayID, expEdge.TargetOSMWayID, expEdge.Source, expEdge.Target, expEdge.SourceComponent, expEdge.TargeComponent)
-							// 	}
-							// }
 							if !(expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID != toOSMWayID && expEdge.SourceComponent.TargetNodeID == osm.NodeID(rvertexVia)) {
 								temp = append(temp, expEdge)
 							}
 						}
 						expandedEdges = temp
 					}
-					// }
 				}
 			}
 			break
