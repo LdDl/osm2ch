@@ -323,6 +323,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 					TargetNodeID: edgeAsToVertex.TargetNodeID,
 				},
 				CostMeters: (costMetersFromVertex + costMetersToVertex) / 2.0,
+				WasOneway:  edgeAsFromVertex.WasOneway,
 				Geom:       completedNewGeom,
 			})
 		}

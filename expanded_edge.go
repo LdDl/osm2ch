@@ -11,6 +11,7 @@ type ExpandedEdge struct {
 	TargetOSMWayID  osm.WayID
 	SourceComponent expandedEdgeComponent
 	TargeComponent  expandedEdgeComponent
+	WasOneway       bool
 	CostMeters      float64
 	/* CostSeconds  float64 */ //@todo: consider cost customization
 	Geom                       []GeoPoint
