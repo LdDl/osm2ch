@@ -248,7 +248,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 						SourceNodeID: source,
 						TargetNodeID: wayNode.ID,
 						CostMeters:   cost,
-						Geom:         geometry,
+						Geom:         copyLine(geometry),
 						WasOneway:    way.Oneway,
 					})
 					if !way.Oneway {
@@ -423,6 +423,5 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 
 	fmt.Printf("Done in %v\n", time.Since(st))
 	fmt.Printf("\tUpdated of expanded edges: %d\n", len(expandedEdges))
-
 	return expandedEdges, nil
 }

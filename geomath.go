@@ -188,6 +188,16 @@ func reverseLine(pts []GeoPoint) []GeoPoint {
 	return output
 }
 
+// copyLine reverses order of points in given line. Returns new slice
+func copyLine(pts []GeoPoint) []GeoPoint {
+	inputLen := len(pts)
+	output := make([]GeoPoint, inputLen)
+	for i, n := range pts {
+		output[i] = n
+	}
+	return output
+}
+
 // reverseLine reverses order of points in given line
 func reverseLineInPlace(pts []GeoPoint) {
 	inputLen := len(pts)
