@@ -52,12 +52,18 @@ func main() {
 	writerEdges := csv.NewWriter(fileEdges)
 	defer writerEdges.Flush()
 	writerEdges.Comma = ';'
-	// 		from_vertex_id - int64, ID of source vertex
-	// 		to_vertex_id - int64, ID of target vertex
-	// 		weight - float64, Weight of an edge
+	//      edge_id - int64, ID of generated edge
+	// 		from_vertex_id - int64, ID of generated source vertex
+	// 		to_vertex_id - int64, ID of generated target vertex
+	// 		osm_way_from - int64, ID of source OSM Way
+	// 		osm_way_to - int64, ID of target OSM Way
+	// 		osm_way_from_source_node - int64, ID of first OSM Node in source OSM Way
+	// 		osm_way_from_target_node - int64, ID of last OSM Node in source OSM Way
+	// 		osm_way_to_source_node - int64, ID of first OSM Node in target OSM Way
+	// 		osm_way_to_target_node - int64, ID of last OSM Node in target OSM Way
+	// 		weight - float64, Weight of an edge (meters/kilometers)
 	//      geom - geometry (WKT or GeoJSON representation)
-	//      was_one_way - if edge was one way
-	err = writerEdges.Write([]string{"id", "from", "to", "osm_way_from", "osm_way_to", "weight", "geom"})
+	err = writerEdges.Write([]string{"id", "from", "to", "osm_way_from", "osm_way_to", "osm_way_from_source_node", "osm_way_from_target_node", "osm_way_to_source_node", "osm_way_to_target_node", "weight", "geom"})
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -129,7 +135,16 @@ func main() {
 			verticesGeoms[target] = osm2ch.GeoPoint{Lon: edge.Geom[len(edge.Geom)-1].Lon, Lat: edge.Geom[len(edge.Geom)-1].Lat}
 		}
 
-		err = writerEdges.Write([]string{fmt.Sprintf("%d", edge.ID), fmt.Sprintf("%d", source), fmt.Sprintf("%d", target), fmt.Sprintf("%d", edge.SourceOSMWayID), fmt.Sprintf("%d", edge.TargetOSMWayID), fmt.Sprintf("%f", cost), geomStr})
+		err = writerEdges.Write([]string{
+			fmt.Sprintf("%d", edge.ID),
+			fmt.Sprintf("%d", source),
+			fmt.Sprintf("%d", target),
+			fmt.Sprintf("%d", edge.SourceOSMWayID),
+			fmt.Sprintf("%d", edge.TargetOSMWayID),
+			fmt.Sprintf("%d", edge.SourceComponent.SourceNodeID), fmt.Sprintf("%d", edge.SourceComponent.TargetNodeID),
+			fmt.Sprintf("%d", edge.TargeComponent.SourceNodeID), fmt.Sprintf("%d", edge.TargeComponent.TargetNodeID),
+			fmt.Sprintf("%f", cost), geomStr})
+
 		if err != nil {
 			fmt.Println(err)
 			return
