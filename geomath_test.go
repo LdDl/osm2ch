@@ -17,7 +17,7 @@ func TestMiddlePoint(t *testing.T) {
 		Lon: 37.65512796336629,
 		Lat: 55.742235325526806,
 	}
-	mpt := middlePoint(p1, p2)
+	mpt := middlePointSegment(p1, p2)
 	if mpt != res {
 		t.Errorf("Middle point must be %v, but got %v", res, mpt)
 	}
