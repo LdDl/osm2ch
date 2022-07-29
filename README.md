@@ -38,13 +38,13 @@ PRs are welcome!
 * Via 'go get':
     ```shell
     go get github.com/LdDl/osm2ch
-    go install github.com/LdDl/osm2ch/cmd/osm2ch@v1.4.0
+    go install github.com/LdDl/osm2ch/cmd/osm2ch@v1.5.0
     ```
     After installation step is complete you can call 'osm2ch' from any place in your system.
 
 * Or download prebuilt binary and make updates in yours PATH environment varibale (both Linux and Windows):
-    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.4.0/windows-osm2ch.zip
-    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.4.0/linux-amd64-osm2ch.tar.gz
+    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.5.0/windows-osm2ch.zip
+    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.5.0/linux-amd64-osm2ch.tar.gz
 
 Note: There is [zlib](https://www.zlib.net/) support in [OSM-pbf parser](https://github.com/paulmach/osm/pull/19).
 If you do not want use it then disable CGO:
@@ -99,12 +99,19 @@ osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf
 
 After that files 'graph.csv', 'graph_vertices.csv', 'graph_shortcuts.csv' will be created (or only 'graph.csv' and 'graph_vertices' if 'contract' flag is set to False).
 
-Header of edges CSV-file is: from_vertex_id;to_vertex_id;weight;geom
-- from_vertex_id - Source vertex;
-- to_vertex_id - Target vertex;
+Header of edges CSV-file is: `from_vertex_id;to_vertex_id;weight;geom;was_one_way;edge_id;osm_way_from;osm_way_to;osm_way_from_source_node;osm_way_from_target_node;osm_way_to_source_node;osm_way_to_target_node`
+- from_vertex_id - Generated source vertex;
+- to_vertex_id - Generated target vertex;
 - weight - Traveling cost from source to target (actually length of an edge in kilometers/meters);
 - geom - Geometry of edge (Linestring) in WKT or GeoJSON format.
 - was_one_way - Boolean value. When source OSM way was "one way" then it's true, otherwise it's false. Might be helpfull for ignore edges with WasOneWay=true when offesting overlapping two-way geometries in some GIS viewer
+- edge_id - ID of generated edge
+- osm_way_from - ID of source OSM Way
+- osm_way_to - ID of target OSM Way
+- osm_way_from_source_node - ID of first OSM Node in source OSM Way
+- osm_way_from_target_node - ID of last OSM Node in source OSM Way
+- osm_way_to_source_node - ID of first OSM Node in target OSM Way
+- osm_way_to_target_node - ID of last OSM Node in target OSM Way
 
 Header of vertices CSV-file is: vertex_id;order_pos;importance;geom
 - vertex_id - Vertex;
@@ -112,7 +119,7 @@ Header of vertices CSV-file is: vertex_id;order_pos;importance;geom
 - importance - Importance of vertex with respect to contraction hierarchies
 - geom - Geometry of vertex (Point) in WKT or GeoJSON format.
 
-Header of shortcuts CSV-file is: from_vertex_id;to_vertex_id;weight;via_vertex_id
+[Optional] Header of shortcuts CSV-file is: from_vertex_id;to_vertex_id;weight;via_vertex_id
 - from_vertex_id - Source vertex;
 - to_vertex_id - Target vertex;
 - weight - Traveling cost from source to target (actually length of the shortcut in kilometers/meters);
