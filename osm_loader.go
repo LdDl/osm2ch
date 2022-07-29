@@ -747,3 +747,21 @@ func PrepareGeoJSONPoint(pt GeoPoint) string {
 	}
 	return string(b)
 }
+
+// calcRadiusCurvature расчет радиуса кривизны
+// a, b и c - длины сторон треугольника, p - полупиреметр, s - площадь треугольника, r - радиус описного круга
+// rs - среднее значение радиуса кривизны на всем участке
+func calcRadiusCurvature(line []GeoPoint) float64 {
+	var rs float64
+	for i := 1; i < len(line)-1; i++ {
+		a := greatCircleDistance(line[i-1], line[i])
+		b := greatCircleDistance(line[i], line[i+1])
+		c := greatCircleDistance(line[i-1], line[i+1])
+		p := (a + b + c) / 2
+		s := math.Sqrt(p * (p - a) * (p - b) * (p - c))
+		r := (a * b * c) / (4 * s)
+		rs += r
+	}
+	rs = 1000 * rs / float64(len(line)-2) // in meters
+	return rs
+}

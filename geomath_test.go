@@ -115,3 +115,30 @@ func TestFindMiddlePoint(t *testing.T) {
 		t.Errorf("Middle point should be after %d-th point, not %d-th", correctCutStart, cutStart)
 	}
 }
+
+func TestRadiusСurvatureLine(t *testing.T) {
+	line := []GeoPoint{
+		GeoPoint{Lon: 37.396747, Lat: 55.8321},
+		GeoPoint{Lon: 37.397111, Lat: 55.831987},
+		GeoPoint{Lon: 37.397222, Lat: 55.831927},
+		GeoPoint{Lon: 37.397322, Lat: 55.831851},
+		GeoPoint{Lon: 37.397384, Lat: 55.83177},
+		GeoPoint{Lon: 37.397415, Lat: 55.831684},
+		GeoPoint{Lon: 37.397407, Lat: 55.831605},
+		GeoPoint{Lon: 37.397363, Lat: 55.831525},
+		GeoPoint{Lon: 37.397283, Lat: 55.83144},
+		GeoPoint{Lon: 37.39717, Lat: 55.831367},
+		GeoPoint{Lon: 37.397001, Lat: 55.831313},
+		GeoPoint{Lon: 37.39682, Lat: 55.831286},
+		GeoPoint{Lon: 37.39662, Lat: 55.83129},
+		GeoPoint{Lon: 37.396464, Lat: 55.831311},
+		GeoPoint{Lon: 37.396345, Lat: 55.831346},
+		GeoPoint{Lon: 37.396202, Lat: 55.83141},
+		GeoPoint{Lon: 37.396123, Lat: 55.831459},
+		GeoPoint{Lon: 37.396059, Lat: 55.831517},
+		GeoPoint{Lon: 37.396013, Lat: 55.831591},
+		GeoPoint{Lon: 37.395989, Lat: 55.831674},
+	}
+	r := calcRadiusCurvature(line)
+	t.Errorf("radius curvature for line: %f m", r)
+}
