@@ -1,6 +1,7 @@
 package osm2ch
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -9,6 +10,17 @@ const (
 	pi180       = math.Pi / 180.0
 	pi180Rev    = 180.0 / math.Pi
 )
+
+// GeoPoint representation of point on Earth
+type GeoPoint struct {
+	Lat float64
+	Lon float64
+}
+
+// String returns pretty printed value for for GeoPoint
+func (gp GeoPoint) String() string {
+	return fmt.Sprintf("Lon: %f | Lat: %f", gp.Lon, gp.Lat)
+}
 
 // calcRadiusCurvature returns radius of curvature for given line (in meters)
 func calcRadiusCurvature(line []GeoPoint) float64 {
@@ -36,7 +48,7 @@ func radiansTodegrees(d float64) float64 {
 	return d * pi180Rev
 }
 
-// greatCircleDistance Returns distance between two geo-points (kilometers)
+// greatCircleDistance returns distance between two geo-points (kilometers)
 func greatCircleDistance(p, q GeoPoint) float64 {
 	lat1 := degreesToRadians(p.Lat)
 	lon1 := degreesToRadians(p.Lon)
@@ -162,5 +174,26 @@ func pointOnSegmentByFraction(p, q GeoPoint, fraction, distance float64) GeoPoin
 	return GeoPoint{
 		Lon: (1-fraction)*p.Lon + (fraction * q.Lon),
 		Lat: (1-fraction)*p.Lat + (fraction * q.Lat),
+	}
+}
+
+// reverseLine reverses order of points in given line. Returns new slice
+func reverseLine(pts []GeoPoint) []GeoPoint {
+	inputLen := len(pts)
+	output := make([]GeoPoint, inputLen)
+	for i, n := range pts {
+		j := inputLen - i - 1
+		output[j] = n
+	}
+	return output
+}
+
+// reverseLine reverses order of points in given line
+func reverseLineInPlace(pts []GeoPoint) {
+	inputLen := len(pts)
+	inputMid := inputLen / 2
+	for i := 0; i < inputMid; i++ {
+		j := inputLen - i - 1
+		pts[i], pts[j] = pts[j], pts[i]
 	}
 }

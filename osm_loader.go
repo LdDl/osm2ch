@@ -5,76 +5,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
-	geojson "github.com/paulmach/go.geojson"
 	"github.com/paulmach/osm"
 	"github.com/pkg/errors"
 
 	"github.com/paulmach/osm/osmpbf"
 )
-
-// GeoPoint Representation of point on Earth
-type GeoPoint struct {
-	Lat float64
-	Lon float64
-}
-
-// String Pretty printing for GeoPoint
-func (gp GeoPoint) String() string {
-	return fmt.Sprintf("Lon: %f | Lat: %f", gp.Lon, gp.Lat)
-}
-
-// restrictionComponent Representation of member of restriction relation. Could be way or node.
-type restrictionComponent struct {
-	ID   int64
-	Type string
-}
-
-// expandedEdge New edge built on top of two adjacent edges
-type expandedEdge struct {
-	ID        int64
-	Cost      float64
-	Geom      []GeoPoint
-	WasOneWay bool // Former OSM object was one way.
-}
-
-// ExpandedGraph Representation of edge expanded graph
-/*
-	map[newSourceVertexID]map[newTargetVertexID]newExpandedEdge
-*/
-type ExpandedGraph map[int64]map[int64]expandedEdge
-
-type preExpandedGraph map[osm.NodeID]map[osm.NodeID]Edge
-
-type EdgeID int64
-
-type Edge struct {
-	ID           EdgeID
-	WayID        osm.WayID
-	SourceNodeID osm.NodeID
-	TargetNodeID osm.NodeID
-	WasOneway    bool
-	Geom         []GeoPoint
-}
-
-type ExpandedEdge struct {
-	ID              int64
-	Source          EdgeID
-	Target          EdgeID
-	SourceOSMWayID  osm.WayID
-	TargetOSMWayID  osm.WayID
-	SourceComponent expandedEdgeComponent
-	TargeComponent  expandedEdgeComponent
-	Cost            float64
-	Geom            []GeoPoint
-}
-
-type expandedEdgeComponent struct {
-	SourceNodeID osm.NodeID
-	TargetNodeID osm.NodeID
-}
 
 // ImportFromOSMFile Imports graph from file of PBF-format (in OSM terms)
 /*
@@ -481,74 +418,4 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 	fmt.Printf("\tUpdated of expanded edges: %d\n", len(expandedEdges))
 
 	return expandedEdges, nil
-}
-
-// reverseLine reverses order of points in given line. Returns new slice
-func reverseLine(pts []GeoPoint) []GeoPoint {
-	inputLen := len(pts)
-	output := make([]GeoPoint, inputLen)
-	for i, n := range pts {
-		j := inputLen - i - 1
-		output[j] = n
-	}
-	return output
-}
-
-// reverseLine reverses order of points in given line
-func reverseLineInPlace(pts []GeoPoint) {
-	inputLen := len(pts)
-	inputMid := inputLen / 2
-	for i := 0; i < inputMid; i++ {
-		j := inputLen - i - 1
-		pts[i], pts[j] = pts[j], pts[i]
-	}
-}
-
-// findOutComingEdges returns IDs of edges for given OSM Way object
-func findOutComingEdges(givenEdge Edge, edges []Edge) []EdgeID {
-	result := []EdgeID{}
-	for _, edge := range edges {
-		if edge.SourceNodeID == givenEdge.TargetNodeID && edge.ID != givenEdge.ID {
-			result = append(result, edge.ID)
-		}
-	}
-	return result
-}
-
-// PrepareWKTLinestring Creates WKT LineString from set of points
-func PrepareWKTLinestring(pts []GeoPoint) string {
-	ptsStr := make([]string, len(pts))
-	for i := range pts {
-		ptsStr[i] = fmt.Sprintf("%f %f", pts[i].Lon, pts[i].Lat)
-	}
-	return fmt.Sprintf("LINESTRING(%s)", strings.Join(ptsStr, ","))
-}
-
-// PrepareGeoJSONLinestring Creates GeoJSON LineString from set of points
-func PrepareGeoJSONLinestring(pts []GeoPoint) string {
-	pts2d := make([][]float64, len(pts))
-	for i := range pts {
-		pts2d[i] = []float64{pts[i].Lon, pts[i].Lat}
-	}
-	b, err := geojson.NewLineStringGeometry(pts2d).MarshalJSON()
-	if err != nil {
-		fmt.Printf("Warning. Can not convert geometry to geojson format: %s", err.Error())
-		return ""
-	}
-	return string(b)
-}
-
-// PrepareWKTPoint Creates WKT Point from given points
-func PrepareWKTPoint(pt GeoPoint) string {
-	return fmt.Sprintf("POINT(%f %f)", pt.Lon, pt.Lat)
-}
-
-// PrepareGeoJSONPoint Creates GeoJSON Point from given point
-func PrepareGeoJSONPoint(pt GeoPoint) string {
-	b, err := geojson.NewPointGeometry([]float64{pt.Lon, pt.Lat}).MarshalJSON()
-	if err != nil {
-		fmt.Printf("Warning. Can not convert geometry to geojson format: %s", err.Error())
-		return ""
-	}
-	return string(b)
 }
