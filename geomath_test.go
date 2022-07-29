@@ -140,5 +140,8 @@ func TestRadiusСurvatureLine(t *testing.T) {
 		GeoPoint{Lon: 37.395989, Lat: 55.831674},
 	}
 	r := calcRadiusCurvature(line)
-	t.Errorf("radius curvature for line: %f m", r)
+	correctR := 47.22026299802612925305
+	if (correctR - r) > 10e-9 {
+		t.Errorf("Correct radius of curve should be %f, but got %f", correctR, r)
+	}
 }
