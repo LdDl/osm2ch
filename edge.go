@@ -12,7 +12,9 @@ type Edge struct {
 	SourceNodeID osm.NodeID
 	TargetNodeID osm.NodeID
 	WasOneway    bool
-	Geom         []GeoPoint
+	CostMeters   float64
+	/* CostSeconds  float64 */ //@todo: consider cost customization
+	Geom                       []GeoPoint
 }
 
 // findOutComingEdges returns IDs of edges for given OSM Way object

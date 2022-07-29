@@ -241,11 +241,13 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 				if node.useCount > 1 {
 					totalEdgesNum++
 					onewayEdges++
+					cost := getSphericalLength(geometry)
 					edges = append(edges, Edge{
 						ID:           EdgeID(totalEdgesNum),
 						WayID:        way.ID,
 						SourceNodeID: source,
 						TargetNodeID: wayNode.ID,
+						CostMeters:   cost,
 						Geom:         geometry,
 						WasOneway:    way.Oneway,
 					})
@@ -257,6 +259,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 							WayID:        way.ID,
 							SourceNodeID: wayNode.ID,
 							TargetNodeID: source,
+							CostMeters:   cost,
 							Geom:         reverseLine(geometry),
 							WasOneway:    false,
 						})
@@ -286,6 +289,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 	expandedEdgesTotal := int64(0)
 	for _, edge := range edges {
 		edgeAsFromVertex := edge
+		costMetersFromVertex := edgeAsFromVertex.CostMeters
 		outcomingEdges := findOutComingEdges(edgeAsFromVertex, edges)
 		for _, outcomingEdge := range outcomingEdges {
 			edgeAsToVertex := edges[outcomingEdge-1] // We assuming that EdgeID == (SliceIndex + 1) which is equivalent to SliceIndex == (EdgeID - 1)
@@ -296,6 +300,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 				cycles++
 				continue
 			}
+			costMetersToVertex := edgeAsToVertex.CostMeters
 			expandedEdgesTotal++
 			beforeFromIdx, fromMiddlePoint := findMiddlePoint(edgeAsFromVertex.Geom)
 			fromGeomHalf := append([]GeoPoint{fromMiddlePoint}, edgeAsFromVertex.Geom[beforeFromIdx+1:len(edgeAsFromVertex.Geom)]...)
@@ -317,7 +322,8 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 					SourceNodeID: edgeAsToVertex.SourceNodeID,
 					TargetNodeID: edgeAsToVertex.TargetNodeID,
 				},
-				Geom: completedNewGeom,
+				CostMeters: (costMetersFromVertex + costMetersToVertex) / 2.0,
+				Geom:       completedNewGeom,
 			})
 		}
 	}

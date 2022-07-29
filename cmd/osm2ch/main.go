@@ -100,7 +100,7 @@ func main() {
 			err = errors.Wrap(err, "Can not create source vertex")
 			return
 		}
-		cost := edge.Cost
+		cost := edge.CostMeters
 		if strings.ToLower(*units) == "m" {
 			cost *= 1000.0
 		}

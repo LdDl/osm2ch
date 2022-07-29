@@ -62,8 +62,8 @@ func greatCircleDistance(p, q GeoPoint) float64 {
 	return ans
 }
 
-// getShericalLength returns length for given line (kilometers)
-func getShericalLength(line []GeoPoint) float64 {
+// getSphericalLength returns length for given line (kilometers)
+func getSphericalLength(line []GeoPoint) float64 {
 	totalLength := 0.0
 	if len(line) < 2 {
 		return totalLength
