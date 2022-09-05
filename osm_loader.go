@@ -3,368 +3,338 @@ package osm2ch
 import (
 	"context"
 	"fmt"
-	"log"
-	"math"
+	"io"
 	"os"
-	"strings"
-
-	geojson "github.com/paulmach/go.geojson"
-	"github.com/pkg/errors"
+	"time"
 
 	"github.com/paulmach/osm"
+	"github.com/pkg/errors"
+
 	"github.com/paulmach/osm/osmpbf"
 )
-
-const (
-	earthRadius = 6370.986884258304
-	pi180       = math.Pi / 180.0
-	pi180Rev    = 180.0 / math.Pi
-)
-
-// GeoPoint Representation of point on Earth
-type GeoPoint struct {
-	Lat float64
-	Lon float64
-}
-
-// String Pretty printing for GeoPoint
-func (gp GeoPoint) String() string {
-	return fmt.Sprintf("Lon: %f | Lat: %f", gp.Lon, gp.Lat)
-}
-
-// edgeComponent Representation of edge (vertex_from -> vertex_to)
-type edgeComponent struct {
-	from int64
-	to   int64
-}
-
-// wayComponent First and last edges of osm.Way
-type wayComponent struct {
-	FirstEdge edgeComponent
-	LastEdge  edgeComponent
-}
-
-// restrictionComponent Representation of member of restriction relation. Could be way or node.
-type restrictionComponent struct {
-	ID   int64
-	Type string
-}
-
-// expandedEdge New edge built on top of two adjacent edges
-type expandedEdge struct {
-	ID        int64
-	Cost      float64
-	Geom      []GeoPoint
-	WasOneWay bool // Former OSM object was one way.
-}
-
-// ExpandedGraph Representation of edge expanded graph
-/*
-	map[newSourceVertexID]map[newTargetVertexID]newExpandedEdge
-*/
-type ExpandedGraph map[int64]map[int64]expandedEdge
 
 // ImportFromOSMFile Imports graph from file of PBF-format (in OSM terms)
 /*
 	File should have PBF (Protocolbuffer Binary Format) extension according to https://github.com/paulmach/osm
 */
-func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, error) {
+func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, error) {
 	f, err := os.Open(fileName)
 	if err != nil {
 		return nil, errors.Wrap(err, "File open")
 	}
 	defer f.Close()
 
-	scanner := osmpbf.New(context.Background(), f, 4)
-	defer scanner.Close()
+	scannerWays := osmpbf.New(context.Background(), f, 4)
+	defer scannerWays.Close()
 
-	nodes := make(map[int64]GeoPoint)
-	vertices := make(map[int64]bool)
-	newEdges := make(ExpandedGraph)
-	newEdgeID := int64(1)
-	allWays := make(map[int64]*wayComponent)
-	restrictions := make(map[string]map[restrictionComponent]map[restrictionComponent]restrictionComponent)
-	possibleRestrictionCombos := make(map[string]map[string]bool)
+	ways := []Way{}
+	nodes := make(map[osm.NodeID]Node)
+	nodesSeen := make(map[osm.NodeID]struct{})
 
-	skipped := 0
-	unsupportedRestrictionRoles := 0
-	for scanner.Scan() {
-		obj := scanner.Object()
-		if obj.ObjectID().Type() == "node" {
-			nodes[obj.ObjectID().Ref()] = GeoPoint{Lon: obj.(*osm.Node).Lon, Lat: obj.(*osm.Node).Lat}
+	fmt.Printf("Scanning ways...")
+	st := time.Now()
+	for scannerWays.Scan() {
+		obj := scannerWays.Object()
+		if obj.ObjectID().Type() != "way" {
+			continue
 		}
-		if obj.ObjectID().Type() == "way" {
-			tagMap := obj.(*osm.Way).TagMap()
-			if tag, ok := tagMap[cfg.EntityName]; ok {
-				if cfg.CheckTag(tag) {
-					oneway := false
-					if v, ok := tagMap["oneway"]; ok {
-						if v == "yes" || v == "1" {
-							oneway = true
-						}
-					}
-					ns := obj.(*osm.Way).Nodes
-					way := obj.(*osm.Way)
-					allWays[int64(way.ID)] = &wayComponent{}
-					for i := 1; i < len(ns); i++ {
-						source := int64(ns[i-1].ID)
-						target := int64(ns[i].ID)
-						if (i - 1) == 0 {
-							allWays[int64(way.ID)].FirstEdge = edgeComponent{
-								from: source,
-								to:   target,
-							}
-						}
-						if i == len(ns)-1 {
-							allWays[int64(way.ID)].LastEdge = edgeComponent{
-								from: source,
-								to:   target,
-							}
-						}
-						a := nodes[source]
-						b := nodes[target]
-						cost := greatCircleDistance(a, b) // kilometers
-						vertices[source] = true
-						vertices[target] = true
-						if _, ok := newEdges[source]; !ok {
-							newEdges[source] = make(map[int64]expandedEdge)
-						}
-
-						if oneway == false {
-							newEdges[source][target] = expandedEdge{
-								ID:   newEdgeID,
-								Cost: cost,
-								Geom: []GeoPoint{a, b},
-							}
-							newEdgeID++
-
-							if _, ok := newEdges[target]; !ok {
-								newEdges[target] = make(map[int64]expandedEdge)
-							}
-							newEdges[target][source] = expandedEdge{
-								ID:   newEdgeID,
-								Cost: cost,
-								Geom: []GeoPoint{b, a},
-							}
-							newEdgeID++
-						} else {
-							newEdges[source][target] = expandedEdge{
-								ID:        newEdgeID,
-								Cost:      cost,
-								Geom:      []GeoPoint{a, b},
-								WasOneWay: true,
-							}
-							newEdgeID++
-						}
-					}
-				}
+		way := obj.(*osm.Way)
+		tagMap := way.TagMap()
+		tag, ok := tagMap[cfg.EntityName]
+		if !ok {
+			continue
+		}
+		if !cfg.CheckTag(tag) {
+			continue
+		}
+		oneway := false
+		if v, ok := tagMap["oneway"]; ok {
+			if v == "yes" || v == "1" {
+				oneway = true
 			}
 		}
+		nodes := way.Nodes
+		preparedWay := Way{
+			ID:     way.ID,
+			Nodes:  make(osm.WayNodes, len(nodes)),
+			Oneway: oneway,
+			TagMap: make(osm.Tags, len(way.Tags)),
+		}
+		copy(preparedWay.Nodes, nodes)
+		copy(preparedWay.TagMap, way.Tags)
+		ways = append(ways, preparedWay)
+		for _, node := range nodes {
+			nodesSeen[node.ID] = struct{}{}
+		}
+	}
+	if scannerWays.Err() != nil {
+		return nil, errors.Wrap(scannerWays.Err(), "Scanner error on Ways")
+	}
+	fmt.Printf("Done in %v\n\tWays: %d\n", time.Since(st), len(ways))
 
-		// Collect restrictions
+	// Seek file to start
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't repeat seeking after ways scanning")
+	}
+	scannerNodes := osmpbf.New(context.Background(), f, 4)
+	defer scannerNodes.Close()
+
+	fmt.Printf("Scanning nodes...")
+	st = time.Now()
+	for scannerNodes.Scan() {
+		obj := scannerNodes.Object()
+		if obj.ObjectID().Type() != "node" {
+			continue
+		}
+		node := obj.(*osm.Node)
+		if _, ok := nodesSeen[node.ID]; ok {
+			delete(nodesSeen, node.ID)
+			nodes[node.ID] = Node{
+				ID:       node.ID,
+				useCount: 0,
+				node:     *node,
+			}
+		}
+	}
+	if scannerNodes.Err() != nil {
+		return nil, errors.Wrap(scannerNodes.Err(), "Scanner error on Nodes")
+	}
+	fmt.Printf("Done in %v\n\tNodes: %d\n", time.Since(st), len(nodes))
+
+	// Seek file to start
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't repeat seeking after nodes scanning")
+	}
+	scannerManeuvers := osmpbf.New(context.Background(), f, 4)
+	defer scannerManeuvers.Close()
+	fmt.Printf("Scanning maneuvers (restrictions)...")
+	st = time.Now()
+	skippedRestrictions := 0
+	unsupportedRestrictionRoles := 0
+	possibleRestrictionCombos := make(map[string]map[string]bool)
+	restrictions := make(map[string]map[restrictionComponent]map[restrictionComponent]restrictionComponent)
+	for scannerManeuvers.Scan() {
+		obj := scannerManeuvers.Object()
 		if obj.ObjectID().Type() == "relation" {
 			relation := obj.(*osm.Relation)
 			tagMap := relation.TagMap()
-			if tag, ok := tagMap["restriction"]; ok {
+			tag, ok := tagMap["restriction"]
+			if !ok {
+				continue
+			}
+			members := relation.Members
+			if len(members) != 3 {
+				skippedRestrictions++
+				// fmt.Printf("Restriction does not contain 3 members, relation ID: %d. Skip it\n", relation.ID)
+				continue
+			}
+			firstMember := restrictionComponent{-1, ""}
+			secondMember := restrictionComponent{-1, ""}
+			thirdMember := restrictionComponent{-1, ""}
 
-				members := relation.Members
-				if len(members) != 3 {
-					skipped++
-					// fmt.Printf("Restriction does not contain 3 members, relation ID: %d. Skip it\n", relation.ID)
-					continue
-				}
-				firstMember := restrictionComponent{-1, ""}
-				secondMember := restrictionComponent{-1, ""}
-				thirdMember := restrictionComponent{-1, ""}
+			switch members[0].Role {
+			case "from":
+				firstMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
+				break
+			case "via":
+				thirdMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
+				break
+			case "to":
+				secondMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
+				break
+			default:
+				unsupportedRestrictionRoles++
+				// fmt.Printf("Something went wrong for first member of relation with ID: %d\n", relation.ID)
+				break
+			}
 
-				switch members[0].Role {
-				case "from":
-					firstMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
-					break
-				case "via":
-					thirdMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
-					break
-				case "to":
-					secondMember = restrictionComponent{members[0].Ref, string(members[0].Type)}
-					break
-				default:
-					unsupportedRestrictionRoles++
-					// fmt.Printf("Something went wrong for first member of relation with ID: %d\n", relation.ID)
-					break
-				}
+			switch members[1].Role {
+			case "from":
+				firstMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
+				break
+			case "via":
+				thirdMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
+				break
+			case "to":
+				secondMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
+				break
+			default:
+				unsupportedRestrictionRoles++
+				// fmt.Printf("Something went wrong for second member of relation with ID: %d\n", relation.ID)
+				break
+			}
 
-				switch members[1].Role {
-				case "from":
-					firstMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
-					break
-				case "via":
-					thirdMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
-					break
-				case "to":
-					secondMember = restrictionComponent{members[1].Ref, string(members[1].Type)}
-					break
-				default:
-					unsupportedRestrictionRoles++
-					// fmt.Printf("Something went wrong for second member of relation with ID: %d\n", relation.ID)
-					break
-				}
+			switch members[2].Role {
+			case "from":
+				firstMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
+				break
+			case "via":
+				thirdMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
+				break
+			case "to":
+				secondMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
+				break
+			default:
+				unsupportedRestrictionRoles++
+				// fmt.Printf("Something went wrong for third member of relation with ID: %d\n", relation.ID)
+				break
+			}
+			if _, ok := possibleRestrictionCombos[tag]; !ok {
+				possibleRestrictionCombos[tag] = make(map[string]bool)
+			}
+			possibleRestrictionCombos[tag][fmt.Sprintf("%s;%s;%s", firstMember.Type, secondMember.Type, thirdMember.Type)] = true
 
-				switch members[2].Role {
-				case "from":
-					firstMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
-					break
-				case "via":
-					thirdMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
-					break
-				case "to":
-					secondMember = restrictionComponent{members[2].Ref, string(members[2].Type)}
-					break
-				default:
-					unsupportedRestrictionRoles++
-					// fmt.Printf("Something went wrong for third member of relation with ID: %d\n", relation.ID)
-					break
-				}
+			if _, ok := restrictions[tag]; !ok {
+				restrictions[tag] = make(map[restrictionComponent]map[restrictionComponent]restrictionComponent)
+			}
+			if _, ok := restrictions[tag][firstMember]; !ok {
+				restrictions[tag][firstMember] = make(map[restrictionComponent]restrictionComponent)
+			}
+			if _, ok := restrictions[tag][firstMember][secondMember]; !ok {
+				restrictions[tag][firstMember][secondMember] = thirdMember
+			}
+		}
+	}
+	fmt.Printf("Done in %v\n", time.Since(st))
+	fmt.Printf("\tSkipped restrictions (which have not exactly 3 members): %d\n", skippedRestrictions)
+	fmt.Printf("\tNumber of unknow restriction roles (only 'from', 'to' and 'via' supported): %d\n", unsupportedRestrictionRoles)
 
-				if _, ok := possibleRestrictionCombos[tag]; !ok {
-					possibleRestrictionCombos[tag] = make(map[string]bool)
+	fmt.Printf("Counting node use cases...")
+	st = time.Now()
+	for _, way := range ways {
+		for i, wayNode := range way.Nodes {
+			if node, ok := nodes[wayNode.ID]; ok {
+				if i == 0 || i == len(way.Nodes)-1 {
+					node.useCount += 2
+					nodes[wayNode.ID] = node
+				} else {
+					node.useCount += 1
+					nodes[wayNode.ID] = node
 				}
-				possibleRestrictionCombos[tag][fmt.Sprintf("%s;%s;%s", firstMember.Type, secondMember.Type, thirdMember.Type)] = true
+			} else {
+				return nil, fmt.Errorf("Missing node with id: %d\n", wayNode.ID)
+			}
+		}
+	}
+	fmt.Printf("Done in %v\n", time.Since(st))
 
-				if _, ok := restrictions[tag]; !ok {
-					restrictions[tag] = make(map[restrictionComponent]map[restrictionComponent]restrictionComponent)
-				}
-
-				if _, ok := restrictions[tag][firstMember]; !ok {
-					restrictions[tag][firstMember] = make(map[restrictionComponent]restrictionComponent)
-				}
-				if _, ok := restrictions[tag][firstMember][secondMember]; !ok {
-					restrictions[tag][firstMember][secondMember] = thirdMember
+	fmt.Printf("Preparing edges...")
+	st = time.Now()
+	edges := []Edge{}
+	onewayEdges := 0
+	notOnewayEdges := 0
+	totalEdgesNum := int64(0)
+	waysSeen := make(map[osm.WayID]struct{})
+	for _, way := range ways {
+		var source osm.NodeID
+		waysSeen[way.ID] = struct{}{}
+		geometry := []GeoPoint{}
+		for i, wayNode := range way.Nodes {
+			node := nodes[wayNode.ID]
+			if i == 0 {
+				source = wayNode.ID
+				geometry = append(geometry, GeoPoint{Lon: node.node.Lon, Lat: node.node.Lat})
+			} else {
+				geometry = append(geometry, GeoPoint{Lon: node.node.Lon, Lat: node.node.Lat})
+				if node.useCount > 1 {
+					totalEdgesNum++
+					onewayEdges++
+					cost := getSphericalLength(geometry)
+					edges = append(edges, Edge{
+						ID:           EdgeID(totalEdgesNum),
+						WayID:        way.ID,
+						SourceNodeID: source,
+						TargetNodeID: wayNode.ID,
+						CostMeters:   cost,
+						Geom:         copyLine(geometry),
+						WasOneway:    way.Oneway,
+					})
+					if !way.Oneway {
+						totalEdgesNum++
+						notOnewayEdges++
+						edges = append(edges, Edge{
+							ID:           EdgeID(totalEdgesNum),
+							WayID:        way.ID,
+							SourceNodeID: wayNode.ID,
+							TargetNodeID: source,
+							CostMeters:   cost,
+							Geom:         reverseLine(geometry),
+							WasOneway:    false,
+						})
+					}
+					source = wayNode.ID
+					geometry = []GeoPoint{GeoPoint{Lon: node.node.Lon, Lat: node.node.Lat}}
 				}
 			}
 		}
 	}
+	fmt.Printf("Done in %v\n\tEdges: (oneway = %d), (not oneway = %d) (total = %d)\n", time.Since(st), onewayEdges, notOnewayEdges, totalEdgesNum)
 
-	if scanner.Err() != nil {
-		return nil, errors.Wrap(scanner.Err(), "Scanner error")
-	}
-
-	expandedGraph := make(ExpandedGraph)
-	for source := range newEdges {
-
-		for target := range newEdges[source] {
-
-			sourceExpandVertex := newEdges[source][target]
-			sourceCost := sourceExpandVertex.Cost
-			sourceMiddlePoint := middlePoint(sourceExpandVertex.Geom[0], sourceExpandVertex.Geom[1])
-			if targetAsSource, ok := newEdges[target]; ok {
-				for subTarget := range targetAsSource {
-					targetExpandVertex := newEdges[target][subTarget]
-					targetCost := targetExpandVertex.Cost
-					targetMiddlePoint := middlePoint(targetExpandVertex.Geom[0], targetExpandVertex.Geom[1])
-
-					// Handle bidirectional edges
-					if sourceExpandVertex.Geom[0] == targetExpandVertex.Geom[1] && sourceExpandVertex.Geom[1] == targetExpandVertex.Geom[0] {
-						continue
-					}
-
-					if _, ok := expandedGraph[sourceExpandVertex.ID]; !ok {
-						expandedGraph[sourceExpandVertex.ID] = make(map[int64]expandedEdge)
-					}
-					expandedGraph[sourceExpandVertex.ID][targetExpandVertex.ID] = expandedEdge{
-						Cost:      (sourceCost + targetCost) / 2.0,
-						Geom:      []GeoPoint{sourceMiddlePoint, sourceExpandVertex.Geom[1], targetMiddlePoint},
-						WasOneWay: sourceExpandVertex.WasOneWay,
-					}
-				}
-			}
+	fmt.Printf("Preparing nodes...")
+	st = time.Now()
+	nodesFiltered := []Node{}
+	for _, node := range nodes {
+		if node.useCount > 1 {
+			nodesFiltered = append(nodesFiltered, node)
 		}
 	}
+	fmt.Printf("Done in %v\n\tNodes: %d\n", time.Since(st), len(nodesFiltered))
 
-	immposibleRestrictions := 0
-	// Handling restrictions of "only" type
-	for i, k := range restrictions {
-		switch i {
-		case "only_left_turn", "only_right_turn", "only_straight_on":
-			// handle only way(from)-way(to)-node(via)
-			for j, v := range k {
-				if j.Type != "way" { // way(from)
-					continue
-				}
-				from, ok := allWays[j.ID]
-				if !ok {
-					continue
-				}
-				for n := range v {
-					if n.Type != "way" { // way(to)
-						continue
-					}
-					if v[n].Type != "node" { // node(via)
-						continue
-					}
-
-					to, ok := allWays[n.ID]
-					if !ok {
-						continue
-					}
-
-					rvertexVia := v[n].ID
-
-					var rvertexFrom, rvertexTo int64
-
-					switch rvertexVia {
-					case from.LastEdge.to:
-						rvertexFrom = from.LastEdge.from
-						break
-					case from.LastEdge.from:
-						rvertexFrom = from.LastEdge.to
-						break
-					case from.FirstEdge.from:
-						rvertexFrom = from.FirstEdge.to
-						break
-					case from.FirstEdge.to:
-						rvertexFrom = from.FirstEdge.from
-						break
-					default:
-						immposibleRestrictions++
-						break
-					}
-
-					switch rvertexVia {
-					case to.FirstEdge.to:
-						rvertexTo = to.FirstEdge.from
-						break
-					case to.FirstEdge.from:
-						rvertexTo = to.FirstEdge.to
-						break
-					case to.LastEdge.to:
-						rvertexTo = to.LastEdge.from
-						break
-					case to.LastEdge.from:
-						rvertexTo = to.LastEdge.to
-						break
-					default:
-						immposibleRestrictions++
-						break
-					}
-
-					fromExp, toExp := newEdges[rvertexFrom][rvertexVia].ID, newEdges[rvertexVia][rvertexTo].ID
-
-					saveExde := expandedGraph[fromExp][toExp]
-					if _, ok := expandedGraph[fromExp]; ok {
-						delete(expandedGraph, fromExp)
-						expandedGraph[fromExp] = make(map[int64]expandedEdge)
-						expandedGraph[fromExp][toExp] = saveExde
-					}
-				}
+	fmt.Printf("Applying edge expanding technique...")
+	st = time.Now()
+	cycles := 0
+	expandedEdges := []ExpandedEdge{}
+	expandedEdgesTotal := int64(0)
+	for _, edge := range edges {
+		edgeAsFromVertex := edge
+		costMetersFromVertex := edgeAsFromVertex.CostMeters
+		outcomingEdges := findOutComingEdges(edgeAsFromVertex, edges)
+		for _, outcomingEdge := range outcomingEdges {
+			edgeAsToVertex := edges[outcomingEdge-1] // We assuming that EdgeID == (SliceIndex + 1) which is equivalent to SliceIndex == (EdgeID - 1)
+			// cycles, u-turn?
+			// @todo: some of those are deadend (or 'boundary') edges
+			if edgeAsFromVertex.Geom[0] == edgeAsToVertex.Geom[len(edgeAsToVertex.Geom)-1] && edgeAsFromVertex.Geom[len(edgeAsFromVertex.Geom)-1] == edgeAsToVertex.Geom[0] {
+				// fmt.Println(PrepareGeoJSONLinestring(edgeAsFromVertex.Geom))
+				cycles++
+				continue
 			}
-			break
-		default:
-			// @todo: need to think about U-turns: "no_u_turn"
-			break
+			costMetersToVertex := edgeAsToVertex.CostMeters
+			expandedEdgesTotal++
+			beforeFromIdx, fromMiddlePoint := findMiddlePoint(edgeAsFromVertex.Geom)
+			fromGeomHalf := append([]GeoPoint{fromMiddlePoint}, edgeAsFromVertex.Geom[beforeFromIdx+1:len(edgeAsFromVertex.Geom)]...)
+			beforeToIdx, toMiddlePoint := findMiddlePoint(edgeAsToVertex.Geom)
+			toGeomHalf := append(make([]GeoPoint, 0, len(edgeAsToVertex.Geom[:beforeToIdx+1])+1), edgeAsToVertex.Geom[:beforeToIdx+1]...)
+			toGeomHalf = append(toGeomHalf, toMiddlePoint)
+			completedNewGeom := append(fromGeomHalf, toGeomHalf...)
+			expandedEdges = append(expandedEdges, ExpandedEdge{
+				ID:             expandedEdgesTotal,
+				Source:         edgeAsFromVertex.ID,
+				Target:         edgeAsToVertex.ID,
+				SourceOSMWayID: edgeAsFromVertex.WayID,
+				TargetOSMWayID: edgeAsToVertex.WayID,
+				SourceComponent: expandedEdgeComponent{
+					SourceNodeID: edgeAsFromVertex.SourceNodeID,
+					TargetNodeID: edgeAsFromVertex.TargetNodeID,
+				},
+				TargeComponent: expandedEdgeComponent{
+					SourceNodeID: edgeAsToVertex.SourceNodeID,
+					TargetNodeID: edgeAsToVertex.TargetNodeID,
+				},
+				CostMeters: (costMetersFromVertex + costMetersToVertex) / 2.0,
+				WasOneway:  edgeAsFromVertex.WasOneway,
+				Geom:       completedNewGeom,
+			})
 		}
-
 	}
+	fmt.Printf("Done in %v\n", time.Since(st))
+	fmt.Printf("\tIgnored cycles: %d\n", cycles)
+	fmt.Printf("\tNumber of expanded edges: %d\n", expandedEdgesTotal)
 
+	// @todo: work with maneuvers (restrictions)
+	fmt.Printf("Working with maneuvers (restrictions)...")
+	st = time.Now()
 	// Handling restrictions of "no" type
 	for i, k := range restrictions {
 		switch i {
@@ -374,8 +344,8 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 				if j.Type != "way" { // way(from)
 					continue
 				}
-				from, ok := allWays[j.ID]
-				if !ok {
+				fromOSMWayID := osm.WayID(j.ID)
+				if _, ok := waysSeen[fromOSMWayID]; !ok {
 					continue
 				}
 				for n := range v {
@@ -385,19 +355,61 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 					if v[n].Type != "node" { // node(via)
 						continue
 					}
-
-					to, ok := allWays[n.ID]
-					if !ok {
+					toOSMWayID := osm.WayID(n.ID)
+					if _, ok := waysSeen[toOSMWayID]; !ok {
 						continue
 					}
-
-					rvertexFrom := from.LastEdge.from
-					rvertexTo := to.FirstEdge.to
+					// Delete restricted expanded edge
+					{
+						temp := expandedEdges[:0]
+						for _, expEdge := range expandedEdges {
+							if expEdge.SourceOSMWayID != fromOSMWayID || expEdge.TargetOSMWayID != toOSMWayID {
+								temp = append(temp, expEdge)
+							}
+						}
+						expandedEdges = temp
+					}
+				}
+			}
+			break
+		default:
+			// @todo: need to think about U-turns: "no_u_turn"
+			break
+		}
+	}
+	// Handling restrictions of "only" type
+	for i, k := range restrictions {
+		switch i {
+		case "only_left_turn", "only_right_turn", "only_straight_on":
+			// handle only way(from)-way(to)-node(via)
+			for j, v := range k {
+				if j.Type != "way" { // way(from)
+					continue
+				}
+				fromOSMWayID := osm.WayID(j.ID)
+				if _, ok := waysSeen[fromOSMWayID]; !ok {
+					continue
+				}
+				for n := range v {
+					if n.Type != "way" { // way(to)
+						continue
+					}
+					if v[n].Type != "node" { // node(via)
+						continue
+					}
+					toOSMWayID := osm.WayID(n.ID)
+					if _, ok := waysSeen[toOSMWayID]; !ok {
+						continue
+					}
 					rvertexVia := v[n].ID
-
-					fromExp, toExp := newEdges[rvertexFrom][rvertexVia].ID, newEdges[rvertexVia][rvertexTo].ID
-					if _, ok := expandedGraph[fromExp]; ok {
-						delete(expandedGraph[fromExp], toExp)
+					{
+						temp := expandedEdges[:0]
+						for _, expEdge := range expandedEdges {
+							if !(expEdge.SourceOSMWayID == fromOSMWayID && expEdge.TargetOSMWayID != toOSMWayID && expEdge.SourceComponent.TargetNodeID == osm.NodeID(rvertexVia)) {
+								temp = append(temp, expEdge)
+							}
+						}
+						expandedEdges = temp
 					}
 				}
 			}
@@ -409,85 +421,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) (ExpandedGraph, e
 
 	}
 
-	log.Printf("Skipped restrictions (which have not exactly 3 members): %d\n", skipped)
-	log.Printf("Not properly handeled restrictions: %d\n", immposibleRestrictions)
-	log.Printf("Number of unknow restriction roles (only 'from', 'to' and 'via' supported): %d\n", unsupportedRestrictionRoles)
-
-	return expandedGraph, nil
-}
-
-// degreesToRadians deg = r * pi / 180
-func degreesToRadians(d float64) float64 {
-	return d * pi180
-}
-
-// radiansTodegrees r = deg  * 180 / pi
-func radiansTodegrees(d float64) float64 {
-	return d * pi180Rev
-}
-
-// greatCircleDistance Returns distance between two geo-points (kilometers)
-func greatCircleDistance(p, q GeoPoint) float64 {
-	lat1 := degreesToRadians(p.Lat)
-	lon1 := degreesToRadians(p.Lon)
-	lat2 := degreesToRadians(q.Lat)
-	lon2 := degreesToRadians(q.Lon)
-	diffLat := lat2 - lat1
-	diffLon := lon2 - lon1
-	a := math.Pow(math.Sin(diffLat/2), 2) + math.Cos(lat1)*math.Cos(lat2)*math.Pow(math.Sin(diffLon/2), 2)
-	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
-	ans := c * earthRadius
-	return ans
-}
-
-func middlePoint(p, q GeoPoint) GeoPoint {
-	lat1 := degreesToRadians(p.Lat)
-	lon1 := degreesToRadians(p.Lon)
-	lat2 := degreesToRadians(q.Lat)
-	lon2 := degreesToRadians(q.Lon)
-
-	Bx := math.Cos(lat2) * math.Cos(lon2-lon1)
-	By := math.Cos(lat2) * math.Sin(lon2-lon1)
-
-	latMid := math.Atan2(math.Sin(lat1)+math.Sin(lat2), math.Sqrt((math.Cos(lat1)+Bx)*(math.Cos(lat1)+Bx)+By*By))
-	lonMid := lon1 + math.Atan2(By, math.Cos(lat1)+Bx)
-	return GeoPoint{Lat: radiansTodegrees(latMid), Lon: radiansTodegrees(lonMid)}
-}
-
-// PrepareWKTLinestring Creates WKT LineString from set of points
-func PrepareWKTLinestring(pts []GeoPoint) string {
-	ptsStr := make([]string, len(pts))
-	for i := range pts {
-		ptsStr[i] = fmt.Sprintf("%f %f", pts[i].Lon, pts[i].Lat)
-	}
-	return fmt.Sprintf("LINESTRING(%s)", strings.Join(ptsStr, ","))
-}
-
-// PrepareGeoJSONLinestring Creates GeoJSON LineString from set of points
-func PrepareGeoJSONLinestring(pts []GeoPoint) string {
-	pts2d := make([][]float64, len(pts))
-	for i := range pts {
-		pts2d[i] = []float64{pts[i].Lon, pts[i].Lat}
-	}
-	b, err := geojson.NewLineStringGeometry(pts2d).MarshalJSON()
-	if err != nil {
-		fmt.Printf("Warning. Can not convert geometry to geojson format: %s", err.Error())
-		return ""
-	}
-	return string(b)
-}
-
-// PrepareWKTPoint Creates WKT Point from given points
-func PrepareWKTPoint(pt GeoPoint) string {
-	return fmt.Sprintf("POINT(%f %f)", pt.Lon, pt.Lat)
-}
-
-// PrepareGeoJSONPoint Creates GeoJSON Point from given point
-func PrepareGeoJSONPoint(pt GeoPoint) string {
-	b, err := geojson.NewPointGeometry([]float64{pt.Lon, pt.Lat}).MarshalJSON()
-	if err != nil {
-		fmt.Printf("Warning. Can not convert geometry to geojson format: %s", err.Error())
-		return ""
-	}
-	return string(b)
+	fmt.Printf("Done in %v\n", time.Since(st))
+	fmt.Printf("\tUpdated of expanded edges: %d\n", len(expandedEdges))
+	return expandedEdges, nil
 }
