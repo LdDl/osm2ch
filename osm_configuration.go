@@ -53,7 +53,7 @@ func (cfg *OsmConfiguration) ParseCostType(tag *string) error {
 	if cfg.CostType == "kilometers" || cfg.CostType == "meters" {
 		return nil
 	}
-	cfg.VLim = &VelisityLimit{}
+	cfg.VLim = &VelocityLimit{}
 	if len(paramsTag) >= 2 {
 		switch paramsTag[1] {
 		case "static":
