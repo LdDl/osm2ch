@@ -11,11 +11,11 @@ type OsmConfiguration struct {
 	EntityName string // Currrently we support 'highway' only
 	Tags       []string
 	CostType   string
-	VLim       *VelisityLimit
+	VLim       *VelocityLimit
 }
 
-// VelisityLimit if cost_type = minutes or seconds
-type VelisityLimit struct {
+// VelocityLimit if cost_type = minutes or seconds
+type VelocityLimit struct {
 	Tag     string // osm tag value
 	Default float64
 }
