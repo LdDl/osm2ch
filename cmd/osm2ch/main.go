@@ -19,6 +19,7 @@ var (
 	out           = flag.String("out", "my_graph.csv", "Filename of 'Comma-Separated Values' (CSV) formatted file. E.g.: if file name is 'map.csv' then 3 files will be produced: 'map.csv' (edges), 'map_vertices.csv', 'map_shortcuts.csv'")
 	geomFormat    = flag.String("geomf", "wkt", "Format of output geometry. Expected values: wkt / geojson")
 	units         = flag.String("units", "km", "Units of output weights. Expected values: km for kilometers / m for meters")
+	costType      = flag.String("cost_type", "kilometers", "Cost types for 'kilometers', 'meters', 'hours' and 'seconds'")
 	doContraction = flag.Bool("contract", true, "Prepare contraction hierarchies?")
 )
 
@@ -30,6 +31,12 @@ func main() {
 	cfg := osm2ch.OsmConfiguration{
 		EntityName: "highway", // Currrently we do not support others
 		Tags:       tags,
+	}
+
+	err := cfg.ParseCostType(costType)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
 	edgeExpandedGraph, err := osm2ch.ImportFromOSMFile(*osmFileName, &cfg)

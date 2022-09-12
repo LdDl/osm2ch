@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/paulmach/osm"
@@ -228,6 +229,46 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 	totalEdgesNum := int64(0)
 	waysSeen := make(map[osm.WayID]struct{})
 	for _, way := range ways {
+		velosityLimKm := 40.0
+		if cfg.VLim != nil && cfg.VLim.Tag == "maxspeed" {
+			maxspeed := way.TagMap.Find("maxspeed")
+			switch maxspeed {
+			case "":
+				if cfg.CostType == "seconds" {
+					velosityLimKm = cfg.VLim.Default * 18 / 5 // km/h
+					break
+				}
+				velosityLimKm = cfg.VLim.Default // km/h
+			case "RU:motorway":
+				velosityLimKm = 110 // km/h
+			case "RU:rural":
+				velosityLimKm = 90 // km/h
+			case "RU:urban":
+				velosityLimKm = 60 // km/h
+			case "RU:living_street":
+				velosityLimKm = 20 // km/h
+			default:
+				value, err := strconv.ParseFloat(maxspeed, 64)
+				if err != nil {
+					velosityLimKm = value
+					break
+				}
+				if cfg.CostType == "seconds" {
+					velosityLimKm = cfg.VLim.Default * 18 / 5 // km/h
+					break
+				}
+				velosityLimKm = cfg.VLim.Default // km/h
+			}
+		}
+		if cfg.VLim != nil && cfg.VLim.Tag == "static" {
+			if cfg.CostType == "seconds" {
+				velosityLimKm = cfg.VLim.Default * 18 / 5 // km/h
+			}
+			if cfg.CostType == "hours" {
+				velosityLimKm = cfg.VLim.Default // km/h
+			}
+		}
+
 		var source osm.NodeID
 		waysSeen[way.ID] = struct{}{}
 		geometry := []GeoPoint{}
@@ -242,12 +283,14 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 					totalEdgesNum++
 					onewayEdges++
 					cost := getSphericalLength(geometry)
+					costHours := cost / velosityLimKm
 					edges = append(edges, Edge{
 						ID:           EdgeID(totalEdgesNum),
 						WayID:        way.ID,
 						SourceNodeID: source,
 						TargetNodeID: wayNode.ID,
 						CostMeters:   cost,
+						CostSeconds:  costHours * 3600,
 						Geom:         copyLine(geometry),
 						WasOneway:    way.Oneway,
 					})
@@ -260,6 +303,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 							SourceNodeID: wayNode.ID,
 							TargetNodeID: source,
 							CostMeters:   cost,
+							CostSeconds:  costHours * 3600,
 							Geom:         reverseLine(geometry),
 							WasOneway:    false,
 						})
