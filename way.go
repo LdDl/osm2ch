@@ -10,3 +10,10 @@ type Way struct {
 	Nodes  osm.WayNodes
 	TagMap osm.Tags
 }
+
+type WayWithNodes struct {
+	ID     osm.WayID
+	Oneway bool
+	Nodes  []osm.NodeID
+	TagMap osm.Tags
+}
