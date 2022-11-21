@@ -25,13 +25,13 @@ type Parser struct {
 func (parser *Parser) String() string {
 	return fmt.Sprintf(`
 Network parser parameters:
-	filename: %s
-	network_types: %s
-	link_types: %s
+	filename: '%s'
+	network_types: '%s'
+	link_types: '%s'
 	prepare POI?: %t
 	POI_sampling_ratio: %f
 	strict_mode enabled?: %t
-	offset: %s
+	offset: '%s'
 	min_nodes: %d
 	combine: %t
 	default_lanes: %v
