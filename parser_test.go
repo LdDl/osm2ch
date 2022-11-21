@@ -26,12 +26,6 @@ func TestParser(t *testing.T) {
 
 	t.Log(parser)
 
-	f, err := os.Open("./sample.osm")
-	if err != nil {
-		t.Error(err)
-	}
-	defer f.Close()
-
 	osmData, err := readOSM("./sample.osm", true)
 	if err != nil {
 		t.Error(err)
