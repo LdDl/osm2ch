@@ -23,7 +23,7 @@ func TestParser(t *testing.T) {
 		t.Error(err)
 	}
 
-	edgesMacro, err := osmData.prepareEdgesMacro(DEFAULT_FIRST_VERTEX, DEFAULT_FIRST_EDGE, verbose)
+	edgesMacro, err := osmData.prepareWaysMedium(DEFAULT_FIRST_VERTEX, DEFAULT_FIRST_EDGE, verbose)
 	if err != nil {
 		t.Error(err)
 	}

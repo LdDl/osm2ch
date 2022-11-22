@@ -15,7 +15,7 @@ type Way struct {
 	TagMap osm.Tags
 }
 
-type WayWithNodes struct {
+type WayRaw struct {
 	ID            osm.WayID
 	Oneway        bool
 	OnewayDefault bool
@@ -53,7 +53,7 @@ var (
 	lanesRegExp = regexp.MustCompile(`\d+\.?\d*`)
 )
 
-func (way *WayWithNodes) flattenTags(verbose bool) {
+func (way *WayRaw) flattenTags(verbose bool) {
 	way.name = way.TagMap.Find("name")
 	way.highway = way.TagMap.Find("highway")
 	way.railway = way.TagMap.Find("railway")
@@ -141,47 +141,47 @@ func (way *WayWithNodes) flattenTags(verbose bool) {
 	way.leisure = way.TagMap.Find("leisure")
 }
 
-func (way *WayWithNodes) isPOI() bool {
+func (way *WayRaw) isPOI() bool {
 	if way.building != "" || way.amenity != "" || way.leisure != "" {
 		return true
 	}
 	return false
 }
 
-func (way *WayWithNodes) isHighwayPOI() bool {
+func (way *WayRaw) isHighwayPOI() bool {
 	if _, ok := poiHighwayTags[way.highway]; ok {
 		return true
 	}
 	return false
 }
 
-func (way *WayWithNodes) isRailwayPOI() bool {
+func (way *WayRaw) isRailwayPOI() bool {
 	if _, ok := poiRailwayTags[way.railway]; ok {
 		return true
 	}
 	return false
 }
 
-func (way *WayWithNodes) isAerowayPOI() bool {
+func (way *WayRaw) isAerowayPOI() bool {
 	if _, ok := poiAerowayTags[way.aeroway]; ok {
 		return true
 	}
 	return false
 }
 
-func (way *WayWithNodes) isHighway() bool {
+func (way *WayRaw) isHighway() bool {
 	return way.highway != ""
 }
 
-func (way *WayWithNodes) isRailway() bool {
+func (way *WayRaw) isRailway() bool {
 	return way.railway != ""
 }
 
-func (way *WayWithNodes) isAeroway() bool {
+func (way *WayRaw) isAeroway() bool {
 	return way.aeroway != ""
 }
 
-func (way *WayWithNodes) isHighwayNegligible() bool {
+func (way *WayRaw) isHighwayNegligible() bool {
 	_, ok := negligibleHighwayTags[way.highway]
 	return ok
 }

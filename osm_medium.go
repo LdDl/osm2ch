@@ -6,7 +6,6 @@ import (
 
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geo"
-	"github.com/paulmach/osm"
 )
 
 const (
@@ -14,34 +13,14 @@ const (
 	DEFAULT_FIRST_EDGE   = 0
 )
 
-type macroEdge struct {
-	tagMap             osm.Tags
-	geom               orb.LineString
-	lengthMeters       float64
-	linkConnectionType LinkConnectionType
-	linkType           LinkType
-	linkClass          LinkClass
-	lanesNum           int
-	maxSpeed           float64
-	freeSpeed          float64
-	capacity           int
-
-	id              int
-	osmID           osm.WayID
-	osmSourceNodeID osm.NodeID
-	osmTargetNodeID osm.NodeID
-	wasOneWay       bool
-	isCycle         bool
-}
-
-func (data *OSMData) prepareEdgesMacro(firstVertex, firstEdge int, verbose bool) ([]*macroEdge, error) {
+func (data *OSMDataRaw) prepareWaysMedium(firstVertex, firstEdge int, verbose bool) ([]*WayMedium, error) {
 
 	if verbose {
-		fmt.Printf("Preparing edges for macroscopic graph...")
+		fmt.Printf("Cook medium ways...")
 	}
 	st := time.Now()
 
-	macroEdges := make([]*macroEdge, 0, len(data.ways))
+	macroEdges := make([]*WayMedium, 0, len(data.ways))
 
 	edgesObserved := firstEdge
 	for _, way := range data.ways {
@@ -57,7 +36,7 @@ func (data *OSMData) prepareEdgesMacro(firstVertex, firstEdge int, verbose bool)
 			continue
 		}
 
-		edge := &macroEdge{
+		edge := &WayMedium{
 			id:              edgesObserved,
 			osmID:           way.ID,
 			geom:            make(orb.LineString, 0, len(way.Nodes)),
@@ -124,7 +103,6 @@ func (data *OSMData) prepareEdgesMacro(firstVertex, firstEdge int, verbose bool)
 		} else {
 			continue
 		}
-
 		for _, nodeID := range way.Nodes {
 			if node, ok := data.nodes[nodeID]; ok {
 				pt := orb.Point{node.node.Lon, node.node.Lat}
@@ -190,7 +168,7 @@ var (
 	}
 )
 
-func (edge *macroEdge) prepareFlowParams() {
+func (edge *WayMedium) prepareFlowParams() {
 	if edge.capacity < 0 {
 		if defaultCap, ok := defaultCapacityByLinkType[edge.linkType]; ok {
 			edge.capacity = defaultCap
