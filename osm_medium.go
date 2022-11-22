@@ -17,7 +17,7 @@ type OSMDataMedium struct {
 	ways []*WayMedium
 }
 
-func (data *OSMDataRaw) prepareWaysMedium(firstVertex, firstEdge int, verbose bool) (*OSMDataMedium, error) {
+func (data *OSMDataRaw) prepareWaysMedium(verbose bool) (*OSMDataMedium, error) {
 
 	if verbose {
 		fmt.Printf("Cook medium ways...")
@@ -26,7 +26,6 @@ func (data *OSMDataRaw) prepareWaysMedium(firstVertex, firstEdge int, verbose bo
 
 	waysMedium := make([]*WayMedium, 0, len(data.ways))
 
-	edgesObserved := firstEdge
 	for _, way := range data.ways {
 		if way.isPOI() {
 			// @todo: handle POI
@@ -41,7 +40,6 @@ func (data *OSMDataRaw) prepareWaysMedium(firstVertex, firstEdge int, verbose bo
 		}
 
 		edge := &WayMedium{
-			id:              edgesObserved,
 			osmID:           way.ID,
 			geom:            make(orb.LineString, 0, len(way.Nodes)),
 			osmSourceNodeID: way.Nodes[0],
@@ -118,7 +116,6 @@ func (data *OSMDataRaw) prepareWaysMedium(firstVertex, firstEdge int, verbose bo
 		edge.lengthMeters = geo.LengthHaversign(edge.geom)
 		edge.prepareFlowParams()
 		waysMedium = append(waysMedium, edge)
-		edgesObserved++
 	}
 	if verbose {
 		fmt.Printf("Done in %v\n", time.Since(st))

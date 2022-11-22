@@ -23,11 +23,11 @@ func TestParser(t *testing.T) {
 		t.Error(err)
 	}
 
-	osmDataMedium, err := osmDataRaw.prepareWaysMedium(DEFAULT_FIRST_VERTEX, DEFAULT_FIRST_EDGE, verbose)
+	osmDataMedium, err := osmDataRaw.prepareWaysMedium(verbose)
 	if err != nil {
 		t.Error(err)
 	}
 	for _, way := range osmDataMedium.ways {
-		fmt.Println(way.id, way.osmID, way.linkClass, way.linkType, way.linkConnectionType, way.wasOneWay, way.lanesNum, way.freeSpeed, way.maxSpeed, way.capacity)
+		fmt.Println(way.osmID, way.linkClass, way.linkType, way.linkConnectionType, way.wasOneWay, way.lanesNum, way.freeSpeed, way.maxSpeed, way.capacity)
 	}
 }

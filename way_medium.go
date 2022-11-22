@@ -17,7 +17,6 @@ type WayMedium struct {
 	freeSpeed          float64
 	capacity           int
 
-	id              int
 	osmID           osm.WayID
 	osmSourceNodeID osm.NodeID
 	osmTargetNodeID osm.NodeID
