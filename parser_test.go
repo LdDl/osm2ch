@@ -18,16 +18,16 @@ func TestParser(t *testing.T) {
 
 	verbose := true
 
-	osmData, err := readOSM("./sample.osm", verbose)
+	osmDataRaw, err := readOSM("./sample.osm", verbose)
 	if err != nil {
 		t.Error(err)
 	}
 
-	edgesMacro, err := osmData.prepareWaysMedium(DEFAULT_FIRST_VERTEX, DEFAULT_FIRST_EDGE, verbose)
+	osmDataMedium, err := osmDataRaw.prepareWaysMedium(DEFAULT_FIRST_VERTEX, DEFAULT_FIRST_EDGE, verbose)
 	if err != nil {
 		t.Error(err)
 	}
-	for _, edge := range edgesMacro {
-		fmt.Println(edge.id, edge.osmID, edge.linkClass, edge.linkType, edge.linkConnectionType, edge.wasOneWay, edge.lanesNum, edge.freeSpeed, edge.maxSpeed, edge.capacity)
+	for _, way := range osmDataMedium.ways {
+		fmt.Println(way.id, way.osmID, way.linkClass, way.linkType, way.linkConnectionType, way.wasOneWay, way.lanesNum, way.freeSpeed, way.maxSpeed, way.capacity)
 	}
 }
