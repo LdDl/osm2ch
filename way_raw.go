@@ -16,13 +16,6 @@ type Way struct {
 }
 
 type WayRaw struct {
-	ID            osm.WayID
-	Oneway        bool
-	OnewayDefault bool
-	IsReversed    bool
-	Nodes         []osm.NodeID
-	TagMap        osm.Tags
-
 	// Flatten tags
 	name              string
 	highway           string
@@ -41,10 +34,19 @@ type WayRaw struct {
 	turnLanes         string
 	turnLanesForward  string
 	turnLanesBackward string
-	maxSpeed          float64
-	lanes             int
-	lanesForward      int
-	lanesBackward     int
+
+	/* Main information */
+	TagMap osm.Tags
+	Nodes  []osm.NodeID
+	ID     osm.WayID
+
+	maxSpeed      float64
+	lanes         int
+	lanesForward  int
+	lanesBackward int
+	Oneway        bool
+	OnewayDefault bool
+	IsReversed    bool
 }
 
 var (

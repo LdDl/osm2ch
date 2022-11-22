@@ -6,20 +6,23 @@ import (
 )
 
 type WayMedium struct {
-	tagMap             osm.Tags
-	geom               orb.LineString
-	lengthMeters       float64
-	linkConnectionType LinkConnectionType
-	linkType           LinkType
-	linkClass          LinkClass
-	lanesNum           int
-	maxSpeed           float64
-	freeSpeed          float64
-	capacity           int
+	geom   orb.LineString
+	tagMap osm.Tags
 
-	osmID           osm.WayID
-	osmSourceNodeID osm.NodeID
 	osmTargetNodeID osm.NodeID
-	wasOneWay       bool
-	isCycle         bool
+	osmSourceNodeID osm.NodeID
+	osmID           osm.WayID
+
+	lanesNum     int
+	capacity     int
+	freeSpeed    float64
+	maxSpeed     float64
+	lengthMeters float64
+
+	linkClass          LinkClass
+	linkType           LinkType
+	linkConnectionType LinkConnectionType
+
+	wasOneWay bool
+	isCycle   bool
 }
