@@ -21,6 +21,10 @@ type macroEdge struct {
 	linkConnectionType LinkConnectionType
 	linkType           LinkType
 	linkClass          LinkClass
+	lanesNum           int
+	maxSpeed           float64
+	freeSpeed          float64
+	capacity           int
 
 	id              int
 	osmID           osm.WayID
@@ -60,6 +64,10 @@ func (data *OSMData) prepareEdgesMacro(firstVertex, firstEdge int, verbose bool)
 			osmSourceNodeID: way.Nodes[0],
 			osmTargetNodeID: way.Nodes[len(way.Nodes)-1],
 			wasOneWay:       way.Oneway,
+			lanesNum:        -1,
+			maxSpeed:        -1,
+			freeSpeed:       -1,
+			capacity:        -1,
 			isCycle:         false,
 		}
 
@@ -87,6 +95,14 @@ func (data *OSMData) prepareEdgesMacro(firstVertex, firstEdge int, verbose bool)
 				edge.linkConnectionType = linkInfo.linkConnectionType
 				edge.linkType = linkInfo.linkType
 				edge.linkClass = LINK_CLASS_HIGHWAY
+
+				if way.lanes > 0 {
+					edge.lanesNum = way.lanes
+				} else {
+					if lanes, ok := defaultLanesByLinkType[edge.linkType]; ok {
+						edge.lanesNum = lanes
+					}
+				}
 			} else {
 				// if verbose {
 				fmt.Printf("\n\t[WARNING]: Unhandled `highway` tag value: '%s'. Way ID: '%d'\n", way.highway, way.ID)
@@ -118,7 +134,7 @@ func (data *OSMData) prepareEdgesMacro(firstVertex, firstEdge int, verbose bool)
 			}
 		}
 		edge.lengthMeters = geo.LengthHaversign(edge.geom)
-
+		edge.prepareFlowParams()
 		macroEdges = append(macroEdges, edge)
 		edgesObserved++
 	}
@@ -127,4 +143,67 @@ func (data *OSMData) prepareEdgesMacro(firstVertex, firstEdge int, verbose bool)
 	}
 
 	return macroEdges, nil
+}
+
+var (
+	defaultLanesByLinkType = map[LinkType]int{
+		LINK_MOTORWAY:     4,
+		LINK_TRUNK:        3,
+		LINK_PRIMARY:      3,
+		LINK_SECONDARY:    2,
+		LINK_TERTIARY:     2,
+		LINK_RESIDENTIAL:  1,
+		LINK_SERVICE:      1,
+		LINK_CYCLEWAY:     1,
+		LINK_FOOTWAY:      1,
+		LINK_TRACK:        1,
+		LINK_UNCLASSIFIED: 1,
+		LINK_CONNECTOR:    2,
+	}
+	defaultSpeedByLinkType = map[LinkType]float64{
+		LINK_MOTORWAY:     120,
+		LINK_TRUNK:        100,
+		LINK_PRIMARY:      80,
+		LINK_SECONDARY:    60,
+		LINK_TERTIARY:     40,
+		LINK_RESIDENTIAL:  30,
+		LINK_SERVICE:      30,
+		LINK_CYCLEWAY:     5,
+		LINK_FOOTWAY:      5,
+		LINK_TRACK:        30,
+		LINK_UNCLASSIFIED: 30,
+		LINK_CONNECTOR:    120,
+	}
+	defaultCapacityByLinkType = map[LinkType]int{
+		LINK_MOTORWAY:     2300,
+		LINK_TRUNK:        2200,
+		LINK_PRIMARY:      1800,
+		LINK_SECONDARY:    1600,
+		LINK_TERTIARY:     1200,
+		LINK_RESIDENTIAL:  1000,
+		LINK_SERVICE:      800,
+		LINK_CYCLEWAY:     800,
+		LINK_FOOTWAY:      800,
+		LINK_TRACK:        800,
+		LINK_UNCLASSIFIED: 800,
+		LINK_CONNECTOR:    9999,
+	}
+)
+
+func (edge *macroEdge) prepareFlowParams() {
+	if edge.capacity < 0 {
+		if defaultCap, ok := defaultCapacityByLinkType[edge.linkType]; ok {
+			edge.capacity = defaultCap
+		}
+	}
+	if edge.freeSpeed < 0 {
+		if edge.maxSpeed >= 0 {
+			edge.freeSpeed = edge.maxSpeed
+		} else {
+			if defaultSpeed, ok := defaultSpeedByLinkType[edge.linkType]; ok {
+				edge.freeSpeed = defaultSpeed
+				edge.maxSpeed = defaultSpeed
+			}
+		}
+	}
 }

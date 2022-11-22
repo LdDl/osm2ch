@@ -28,6 +28,6 @@ func TestParser(t *testing.T) {
 		t.Error(err)
 	}
 	for _, edge := range edgesMacro {
-		fmt.Println(edge.id, edge.osmID, edge.linkClass, edge.linkType, edge.linkConnectionType, edge.wasOneWay)
+		fmt.Println(edge.id, edge.osmID, edge.linkClass, edge.linkType, edge.linkConnectionType, edge.wasOneWay, edge.lanesNum, edge.freeSpeed, edge.maxSpeed, edge.capacity)
 	}
 }
