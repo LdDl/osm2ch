@@ -41,9 +41,9 @@ const (
 	LINK_AEROWAY
 )
 
-// func (iotaIdx LinkType) String() string {
-// 	return [...]string{"motorway", "trunk", "primary", "secondary", "tertiary", "residential", "living_street", "service", "cycleway", "footway", "track", "unclassified", "connector", "railway", "aeroway"}[iotaIdx-1]
-// }
+func (iotaIdx LinkType) String() string {
+	return [...]string{"motorway", "trunk", "primary", "secondary", "tertiary", "residential", "living_street", "service", "cycleway", "footway", "track", "unclassified", "connector", "railway", "aeroway"}[iotaIdx-1]
+}
 
 type linkComposition struct {
 	linkType           LinkType

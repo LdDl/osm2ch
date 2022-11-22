@@ -23,8 +23,9 @@ type OSMScanner interface {
 
 type OSMDataRaw struct {
 	restrictions map[string]map[restrictionComponent]map[restrictionComponent]restrictionComponent
-	nodes        map[osm.NodeID]Node
-	ways         []*WayRaw
+	nodes        map[osm.NodeID]*Node
+	waysRaw      []*WayData
+	waysMedium   []*WayData
 }
 
 func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
@@ -43,7 +44,7 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 		fmt.Printf("\tProcessing ways... ")
 	}
 	st := time.Now()
-	ways := []*WayRaw{}
+	ways := []*WayData{}
 	nodesSeen := make(map[osm.NodeID]struct{})
 	{
 		var scannerWays OSMScanner
@@ -98,7 +99,7 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 					onewayDefault = true
 				}
 			}
-			preparedWay := &WayRaw{
+			preparedWay := &WayData{
 				ID:            way.ID,
 				Oneway:        oneway,
 				OnewayDefault: onewayDefault,
@@ -141,7 +142,7 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 		fmt.Printf("\tProcessing nodes... ")
 	}
 	st = time.Now()
-	nodes := make(map[osm.NodeID]Node)
+	nodes := make(map[osm.NodeID]*Node)
 	{
 
 		var scannerNodes OSMScanner
@@ -167,10 +168,19 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 			node := obj.(*osm.Node)
 			if _, ok := nodesSeen[node.ID]; ok {
 				delete(nodesSeen, node.ID)
-				nodes[node.ID] = Node{
-					ID:       node.ID,
-					useCount: 0,
-					node:     *node,
+				nameText := node.Tags.Find("name")
+				highwayText := node.Tags.Find("highway")
+				controlType := NOT_SIGNAL
+				if highwayText == "traffic_signals" {
+					controlType = IS_SIGNAL
+				}
+				nodes[node.ID] = &Node{
+					name:        nameText,
+					node:        *node,
+					ID:          node.ID,
+					useCount:    0,
+					isCrossing:  false,
+					controlType: controlType,
 				}
 			}
 		}
@@ -308,21 +318,21 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 	}
 
 	// Posprocess nodes use counter
-	for _, way := range ways {
-		for i, wayNode := range way.Nodes {
-			if node, ok := nodes[wayNode]; ok {
-				if i == 0 || i == len(way.Nodes)-1 {
-					node.useCount += 2
-					nodes[wayNode] = node
-				} else {
-					node.useCount += 1
-					nodes[wayNode] = node
-				}
-			} else {
-				return nil, fmt.Errorf("Missing node with id: %d\n", wayNode)
-			}
-		}
-	}
+	// for _, way := range ways {
+	// 	for i, wayNode := range way.Nodes {
+	// 		if node, ok := nodes[wayNode]; ok {
+	// 			if i == 0 || i == len(way.Nodes)-1 {
+	// 				node.useCount += 2
+	// 				nodes[wayNode] = node
+	// 			} else {
+	// 				node.useCount += 1
+	// 				nodes[wayNode] = node
+	// 			}
+	// 		} else {
+	// 			return nil, fmt.Errorf("Missing node with id: %d\n", wayNode)
+	// 		}
+	// 	}
+	// }
 
 	if verbose {
 		fmt.Printf("Number of ways: %d\n", len(ways))
@@ -332,8 +342,17 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 	}
 
 	return &OSMDataRaw{
-		ways:         ways,
+		waysRaw:      ways,
 		nodes:        nodes,
 		restrictions: restrictions,
 	}, nil
+}
+
+func (data *OSMDataRaw) prepare(verbose bool) {
+	data.prepareMedium(verbose)
+	data.prepareWellDone(verbose)
+
+	for _, way := range data.waysMedium {
+		fmt.Println(way.ID, way.linkClass, way.linkType, way.linkConnectionType, way.Oneway, way.lanes, way.maxSpeed)
+	}
 }

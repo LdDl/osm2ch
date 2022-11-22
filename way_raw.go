@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/paulmach/orb"
 	"github.com/paulmach/osm"
 )
 
@@ -15,7 +16,7 @@ type Way struct {
 	TagMap osm.Tags
 }
 
-type WayRaw struct {
+type WayData struct {
 	// Flatten tags
 	name              string
 	highway           string
@@ -34,19 +35,27 @@ type WayRaw struct {
 	turnLanes         string
 	turnLanesForward  string
 	turnLanesBackward string
-
 	/* Main information */
-	TagMap osm.Tags
-	Nodes  []osm.NodeID
-	ID     osm.WayID
-
-	maxSpeed      float64
-	lanes         int
-	lanesForward  int
-	lanesBackward int
-	Oneway        bool
-	OnewayDefault bool
-	IsReversed    bool
+	TagMap             osm.Tags
+	Nodes              []osm.NodeID
+	ID                 osm.WayID
+	osmTargetNodeID    osm.NodeID         // Medium
+	osmSourceNodeID    osm.NodeID         // Medium
+	isCycle            bool               // Medium
+	isPureCycle        bool               // Well-done
+	linkClass          LinkClass          // Medium
+	linkType           LinkType           // Medium
+	linkConnectionType LinkConnectionType // Medium
+	geom               orb.LineString     // Medium
+	capacity           int                // Well-done
+	freeSpeed          float64            // Well-done
+	maxSpeed           float64
+	lanes              int
+	lanesForward       int
+	lanesBackward      int
+	Oneway             bool
+	OnewayDefault      bool
+	IsReversed         bool
 }
 
 var (
@@ -55,7 +64,7 @@ var (
 	lanesRegExp = regexp.MustCompile(`\d+\.?\d*`)
 )
 
-func (way *WayRaw) flattenTags(verbose bool) {
+func (way *WayData) flattenTags(verbose bool) {
 	way.name = way.TagMap.Find("name")
 	way.highway = way.TagMap.Find("highway")
 	way.railway = way.TagMap.Find("railway")
@@ -143,47 +152,47 @@ func (way *WayRaw) flattenTags(verbose bool) {
 	way.leisure = way.TagMap.Find("leisure")
 }
 
-func (way *WayRaw) isPOI() bool {
+func (way *WayData) isPOI() bool {
 	if way.building != "" || way.amenity != "" || way.leisure != "" {
 		return true
 	}
 	return false
 }
 
-func (way *WayRaw) isHighwayPOI() bool {
+func (way *WayData) isHighwayPOI() bool {
 	if _, ok := poiHighwayTags[way.highway]; ok {
 		return true
 	}
 	return false
 }
 
-func (way *WayRaw) isRailwayPOI() bool {
+func (way *WayData) isRailwayPOI() bool {
 	if _, ok := poiRailwayTags[way.railway]; ok {
 		return true
 	}
 	return false
 }
 
-func (way *WayRaw) isAerowayPOI() bool {
+func (way *WayData) isAerowayPOI() bool {
 	if _, ok := poiAerowayTags[way.aeroway]; ok {
 		return true
 	}
 	return false
 }
 
-func (way *WayRaw) isHighway() bool {
+func (way *WayData) isHighway() bool {
 	return way.highway != ""
 }
 
-func (way *WayRaw) isRailway() bool {
+func (way *WayData) isRailway() bool {
 	return way.railway != ""
 }
 
-func (way *WayRaw) isAeroway() bool {
+func (way *WayData) isAeroway() bool {
 	return way.aeroway != ""
 }
 
-func (way *WayRaw) isHighwayNegligible() bool {
+func (way *WayData) isHighwayNegligible() bool {
 	_, ok := negligibleHighwayTags[way.highway]
 	return ok
 }

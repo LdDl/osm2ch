@@ -2,52 +2,52 @@ package osm2ch
 
 var (
 	junctionTypes = map[string]struct{}{
-		"circular":   struct{}{},
-		"roundabout": struct{}{},
+		"circular":   {},
+		"roundabout": {},
 	}
 
 	poiHighwayTags = map[string]struct{}{
-		"bus_stop": struct{}{},
-		"platform": struct{}{},
+		"bus_stop": {},
+		"platform": {},
 	}
 
 	poiRailwayTags = map[string]struct{}{
-		"depot":         struct{}{},
-		"workshop":      struct{}{},
-		"halt":          struct{}{},
-		"interlocking":  struct{}{},
-		"junction":      struct{}{},
-		"spur_junction": struct{}{},
-		"terminal":      struct{}{},
-		"platform":      struct{}{},
+		"depot":         {},
+		"workshop":      {},
+		"halt":          {},
+		"interlocking":  {},
+		"junction":      {},
+		"spur_junction": {},
+		"terminal":      {},
+		"platform":      {},
 	}
 
 	poiAerowayTags = map[string]struct{}{}
 
 	negligibleHighwayTags = map[string]struct{}{
-		"path":         struct{}{},
-		"construction": struct{}{},
-		"proposed":     struct{}{},
-		"raceway":      struct{}{},
-		"bridleway":    struct{}{},
-		"rest_area":    struct{}{},
-		"su":           struct{}{},
-		"road":         struct{}{},
-		"abandoned":    struct{}{},
-		"planned":      struct{}{},
-		"trailhead":    struct{}{},
-		"stairs":       struct{}{},
-		"dismantled":   struct{}{},
-		"disused":      struct{}{},
-		"razed":        struct{}{},
-		"access":       struct{}{},
-		"corridor":     struct{}{},
-		"stop":         struct{}{},
+		"path":         {},
+		"construction": {},
+		"proposed":     {},
+		"raceway":      {},
+		"bridleway":    {},
+		"rest_area":    {},
+		"su":           {},
+		"road":         {},
+		"abandoned":    {},
+		"planned":      {},
+		"trailhead":    {},
+		"stairs":       {},
+		"dismantled":   {},
+		"disused":      {},
+		"razed":        {},
+		"access":       {},
+		"corridor":     {},
+		"stop":         {},
 	}
 
 	// See ref.: https://wiki.openstreetmap.org/wiki/Tag:oneway%3Dreversible
 	onewayReversible = map[string]struct{}{
-		"reversible":  struct{}{},
-		"alternating": struct{}{},
+		"reversible":  {},
+		"alternating": {},
 	}
 )

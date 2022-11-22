@@ -5,9 +5,10 @@ import (
 	"github.com/paulmach/osm"
 )
 
-type WayMedium struct {
+type WayWellDone struct {
 	geom   orb.LineString
 	tagMap osm.Tags
+	Nodes  []osm.NodeID
 
 	osmTargetNodeID osm.NodeID
 	osmSourceNodeID osm.NodeID
