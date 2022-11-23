@@ -86,6 +86,12 @@ func (data *OSMDataRaw) prepareWaysMedium(verbose bool) error {
 					way.lanes = lanes
 				}
 			}
+
+			// Need to consider allowed tags only
+			allowedAgentTypes := way.getAllowableAgentType()
+			if !agentsIntersects(allowedAgentTypes, data.allowedAgentTypes) {
+				continue
+			}
 			way.geom = make(orb.LineString, 0, len(way.Nodes))
 			data.nodes[way.Nodes[0]].isCrossing = true
 			data.nodes[way.Nodes[len(way.Nodes)-1]].isCrossing = true
@@ -136,4 +142,15 @@ func (data *OSMDataRaw) prepareNodesMedium(verbose bool) error {
 		fmt.Printf("Done in %v\n", time.Since(st))
 	}
 	return nil
+}
+
+func agentsIntersects(left []AgentType, right []AgentType) bool {
+	for _, l := range left {
+		for _, r := range right {
+			if l == r {
+				return true
+			}
+		}
+	}
+	return false
 }

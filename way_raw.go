@@ -25,6 +25,7 @@ type WayData struct {
 	junction          string
 	area              string
 	motorVehicle      string
+	access            string
 	motorcar          string
 	service           string
 	foot              string
@@ -143,6 +144,7 @@ func (way *WayData) flattenTags(verbose bool) {
 	way.junction = way.TagMap.Find("junction")
 	way.area = way.TagMap.Find("area")
 	way.motorVehicle = way.TagMap.Find("motor_vehicle")
+	way.access = ""
 	way.motorcar = way.TagMap.Find("motorcar")
 	way.service = way.TagMap.Find("service")
 	way.foot = way.TagMap.Find("foot")
@@ -195,4 +197,120 @@ func (way *WayData) isAeroway() bool {
 func (way *WayData) isHighwayNegligible() bool {
 	_, ok := negligibleHighwayTags[way.highway]
 	return ok
+}
+
+func (way *WayData) findIncludedAgent(agentType AgentType) bool {
+	accessType, ok := agentFiltersInclude[agentType]
+	if !ok {
+		return false
+	}
+	switch agentType {
+	case AGENT_AUTO:
+		// Check `motor_vehicle`
+		if _, ok := accessType[ACCESS_MOTOR_VEHICLE][way.motorVehicle]; ok {
+			return true
+		}
+		// Check `motorcar`
+		if _, ok := accessType[ACCESS_MOTORCAR][way.motorcar]; ok {
+			return true
+		}
+	case AGENT_BIKE:
+		// Check `bicycle`
+		if _, ok := accessType[ACCESS_BICYCLE][way.bicycle]; ok {
+			return true
+		}
+	case AGENT_WALK:
+		// Check `foot`
+		if _, ok := accessType[ACCESS_FOOT][way.foot]; ok {
+			return true
+		}
+	default:
+		return false
+	}
+	return false
+}
+
+func (way *WayData) findExcludedAgent(agentType AgentType) bool {
+	accessType, ok := agentFiltersExclude[agentType]
+	if !ok {
+		return true
+	}
+	switch agentType {
+	case AGENT_AUTO:
+		// Check `highway`
+		if _, ok := accessType[ACCESS_HIGHWAY][way.highway]; ok {
+			return false
+		}
+		// Check `motor_vehicle`
+		if _, ok := accessType[ACCESS_MOTOR_VEHICLE][way.motorVehicle]; ok {
+			return false
+		}
+		// Check `motorcar`
+		if _, ok := accessType[ACCESS_MOTORCAR][way.motorcar]; ok {
+			return false
+		}
+		// Check `access`
+		if _, ok := accessType[ACCESS_OSM_ACCESS][way.access]; ok {
+			return false
+		}
+		// Check `service`
+		if _, ok := accessType[ACCESS_SERVICE][way.service]; ok {
+			return false
+		}
+	case AGENT_BIKE:
+		// Check `highway`
+		if _, ok := accessType[ACCESS_HIGHWAY][way.highway]; ok {
+			return false
+		}
+		// Check `bicycle`
+		if _, ok := accessType[ACCESS_BICYCLE][way.bicycle]; ok {
+			return false
+		}
+		// Check `service`
+		if _, ok := accessType[ACCESS_SERVICE][way.service]; ok {
+			return false
+		}
+		// Check `access`
+		if _, ok := accessType[ACCESS_OSM_ACCESS][way.access]; ok {
+			return false
+		}
+	case AGENT_WALK:
+		// Check `highway`
+		if _, ok := accessType[ACCESS_HIGHWAY][way.highway]; ok {
+			return false
+		}
+		// Check `foot`
+		if _, ok := accessType[ACCESS_FOOT][way.foot]; ok {
+			return false
+		}
+		// Check `service`
+		if _, ok := accessType[ACCESS_SERVICE][way.service]; ok {
+			return false
+		}
+		// Check `access`
+		if _, ok := accessType[ACCESS_OSM_ACCESS][way.access]; ok {
+			return false
+		}
+	default:
+		return true
+	}
+
+	return true
+}
+
+func (way *WayData) getAllowableAgentType() []AgentType {
+	allowedAgents := []AgentType{}
+	for agentType := range agentTypes {
+		included := way.findIncludedAgent(agentType)
+		if included {
+			allowedAgents = append(allowedAgents, agentType)
+			continue
+		}
+		excluded := way.findExcludedAgent(agentType)
+		if excluded {
+			allowedAgents = append(allowedAgents, agentType)
+			continue
+		}
+	}
+	return allowedAgents
 }

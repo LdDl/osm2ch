@@ -26,6 +26,8 @@ type OSMDataRaw struct {
 	nodes        map[osm.NodeID]*Node
 	waysRaw      []*WayData
 	waysMedium   []*WayData
+
+	allowedAgentTypes []AgentType
 }
 
 func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
@@ -317,23 +319,6 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 		fmt.Printf("Done in %v\n", time.Since(st))
 	}
 
-	// Posprocess nodes use counter
-	// for _, way := range ways {
-	// 	for i, wayNode := range way.Nodes {
-	// 		if node, ok := nodes[wayNode]; ok {
-	// 			if i == 0 || i == len(way.Nodes)-1 {
-	// 				node.useCount += 2
-	// 				nodes[wayNode] = node
-	// 			} else {
-	// 				node.useCount += 1
-	// 				nodes[wayNode] = node
-	// 			}
-	// 		} else {
-	// 			return nil, fmt.Errorf("Missing node with id: %d\n", wayNode)
-	// 		}
-	// 	}
-	// }
-
 	if verbose {
 		fmt.Printf("Number of ways: %d\n", len(ways))
 		fmt.Printf("Number of nodes: %d\n", len(nodes))
@@ -341,11 +326,15 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 		fmt.Printf("Number of unknow restriction roles (only 'from', 'to' and 'via' supported): %d\n", unsupportedRestrictionRoles)
 	}
 
-	return &OSMDataRaw{
+	data := OSMDataRaw{
 		waysRaw:      ways,
 		nodes:        nodes,
 		restrictions: restrictions,
-	}, nil
+	}
+	if len(data.allowedAgentTypes) == 0 {
+		data.allowedAgentTypes = []AgentType{AGENT_AUTO}
+	}
+	return &data, nil
 }
 
 func (data *OSMDataRaw) prepare(verbose bool) {
