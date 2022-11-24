@@ -203,7 +203,7 @@ func (way *WayData) isHighwayNegligible() bool {
 }
 
 func (way *WayData) findIncludedAgent(agentType AgentType) bool {
-	accessType, ok := agentFiltersInclude[agentType]
+	accessType, ok := agentsAccessIncludeValues[agentType]
 	if !ok {
 		return false
 	}
@@ -234,7 +234,7 @@ func (way *WayData) findIncludedAgent(agentType AgentType) bool {
 }
 
 func (way *WayData) findExcludedAgent(agentType AgentType) bool {
-	accessType, ok := agentFiltersExclude[agentType]
+	accessType, ok := agentsAccessExcludeValues[agentType]
 	if !ok {
 		return true
 	}
@@ -303,7 +303,7 @@ func (way *WayData) findExcludedAgent(agentType AgentType) bool {
 
 func (way *WayData) getAllowableAgentType() []AgentType {
 	allowedAgents := []AgentType{}
-	for agentType := range agentTypes {
+	for agentType := range agentTypesAll {
 		included := way.findIncludedAgent(agentType)
 		if included {
 			allowedAgents = append(allowedAgents, agentType)
