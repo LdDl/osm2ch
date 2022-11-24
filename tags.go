@@ -37,6 +37,10 @@ var (
 		"aeroway": {},
 	}
 
+	networkTypesDefault = map[string]struct{}{
+		"auto": {},
+	}
+
 	agentTypes = map[AgentType]struct{}{
 		AGENT_AUTO: {},
 		AGENT_BIKE: {},

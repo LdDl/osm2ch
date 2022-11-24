@@ -337,11 +337,94 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 	return &data, nil
 }
 
-func (data *OSMDataRaw) prepare(verbose bool) {
-	data.prepareMedium(verbose)
-	data.prepareWellDone(verbose)
+func (data *OSMDataRaw) prepare(verbose bool) error {
+	err := data.prepareMedium(verbose)
+	if err != nil {
+		return errors.Wrap(err, "Can't cook medium")
+	}
+	err = data.prepareWellDone(verbose)
+	if err != nil {
+		return errors.Wrap(err, "Can't cook well-done")
+	}
+	err = data.prepareNodesAndLinks(verbose)
+	if err != nil {
+		return errors.Wrap(err, "Can't prepare links")
+	}
+	return nil
+}
 
+func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) error {
+	lastLinkID := 0
+	lastNodeID := 0
+
+	observed := make(map[osm.NodeID]struct{})
+	nodes := make(map[int]struct{})
+	links := make(map[int]struct{})
 	for _, way := range data.waysMedium {
-		fmt.Println(way.ID, way.linkClass, way.linkType, way.linkConnectionType, way.Oneway, way.lanes, way.maxSpeed)
+		if way.isPureCycle {
+			continue
+		}
+		way.prepareSegments(data.nodes)
+		for _, segment := range way.segments {
+			if len(segment) < 2 {
+				continue
+			}
+			/* Create nodes */
+			sourceNodeID := segment[0]
+			targetNodeID := segment[len(segment)-1]
+			sourceNode, ok := data.nodes[sourceNodeID]
+			if !ok {
+				return fmt.Errorf("No such source node '%d'. Way ID: '%d'", sourceNodeID, way.ID)
+			}
+			if _, ok := observed[sourceNodeID]; !ok {
+				_ = sourceNode
+				nodes[lastNodeID] = struct{}{}
+				observed[sourceNodeID] = struct{}{}
+				lastNodeID++
+			}
+			targetNode, ok := data.nodes[targetNodeID]
+			if !ok {
+				return fmt.Errorf("No such target node '%d'. Way ID: '%d'", targetNodeID, way.ID)
+			}
+			if _, ok := observed[targetNodeID]; !ok {
+				_ = targetNode
+				nodes[lastNodeID] = struct{}{}
+				observed[targetNodeID] = struct{}{}
+				lastNodeID++
+			}
+			/* Create links */
+			links[lastLinkID] = struct{}{}
+			lastLinkID++
+			if !way.Oneway {
+				links[lastLinkID] = struct{}{}
+				lastLinkID++
+			}
+		}
+	}
+	fmt.Println("Links", len(links), lastLinkID)
+	fmt.Println("Nodes", len(nodes), lastNodeID)
+	return nil
+}
+
+func (way *WayData) prepareSegments(nodes map[osm.NodeID]*Node) {
+	nodesNum := len(way.Nodes)
+	lastNodeIdx := 0
+	idx := 0
+	for {
+		segmentNodes := []osm.NodeID{way.Nodes[lastNodeIdx]}
+		for idx = lastNodeIdx + 1; idx < nodesNum; idx++ {
+			nextNodeID := way.Nodes[idx]
+			nextNode := nodes[nextNodeID]
+			segmentNodes = append(segmentNodes, nextNodeID)
+			if nextNode.isCrossing {
+				lastNodeIdx = idx
+				break
+			}
+		}
+		way.segments = append(way.segments, segmentNodes)
+		way.segmentsNum++
+		if idx == nodesNum-1 {
+			break
+		}
 	}
 }

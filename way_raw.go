@@ -57,6 +57,9 @@ type WayData struct {
 	Oneway             bool
 	OnewayDefault      bool
 	IsReversed         bool
+
+	segments    [][]osm.NodeID
+	segmentsNum int
 }
 
 var (
