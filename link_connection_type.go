@@ -8,3 +8,7 @@ const (
 	// Connection between two roads
 	IS_LINK
 )
+
+func (iotaIdx LinkConnectionType) String() string {
+	return [...]string{"no", "yes"}[iotaIdx]
+}

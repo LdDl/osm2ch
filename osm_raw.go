@@ -378,6 +378,8 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 			if len(segment) < 2 {
 				continue
 			}
+			var currentSourceNodeID NetworkNodeID
+			var currentTargetNodeID NetworkNodeID
 			/* Create nodes */
 			sourceNodeID := segment[0]
 			if _, ok := observed[sourceNodeID]; !ok {
@@ -387,6 +389,7 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 				}
 				nodes[lastNodeID] = networkNodeFromOSM(lastNodeID, sourceNode)
 				observed[sourceNodeID] = struct{}{}
+				currentSourceNodeID = lastNodeID
 				lastNodeID++
 			}
 			targetNodeID := segment[len(segment)-1]
@@ -397,6 +400,7 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 				}
 				nodes[lastNodeID] = networkNodeFromOSM(lastNodeID, targetNode)
 				observed[targetNodeID] = struct{}{}
+				currentTargetNodeID = lastNodeID
 				lastNodeID++
 			}
 
@@ -405,10 +409,10 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 			for i, nodeID := range segment {
 				nodesForSegment[i] = data.nodes[nodeID]
 			}
-			links[lastLinkID] = networkLinkFromOSM(lastLinkID, DIRECTION_FORWARD, way, nodesForSegment)
+			links[lastLinkID] = networkLinkFromOSM(lastLinkID, currentSourceNodeID, currentTargetNodeID, DIRECTION_FORWARD, way, nodesForSegment)
 			lastLinkID++
 			if !way.Oneway {
-				links[lastLinkID] = networkLinkFromOSM(lastLinkID, DIRECTION_BACKWARD, way, nodesForSegment)
+				links[lastLinkID] = networkLinkFromOSM(lastLinkID, currentTargetNodeID, currentSourceNodeID, DIRECTION_BACKWARD, way, nodesForSegment)
 				lastLinkID++
 			}
 		}

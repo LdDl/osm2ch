@@ -1,10 +1,13 @@
 package osm2ch
 
 import (
-	"math"
+	"encoding/csv"
+	"fmt"
+	"os"
+	"strings"
 
-	"github.com/paulmach/orb"
-	"github.com/paulmach/osm"
+	"github.com/paulmach/orb/encoding/wkt"
+	"github.com/pkg/errors"
 )
 
 type NetworkMacroscopic struct {
@@ -12,149 +15,97 @@ type NetworkMacroscopic struct {
 	nodes map[NetworkNodeID]*NetworkNode
 }
 
-/* Links stuff */
-type NetworkLinkID int
+func (net *NetworkMacroscopic) ExportToCSV(fname string) error {
 
-type NetworkLink struct {
-	name               string
-	geom               orb.LineString
-	lanesList          []int
-	freeSpeed          float64
-	maxSpeed           float64
-	capacity           int
-	ID                 NetworkLinkID
-	osmWayID           osm.WayID
-	linkClass          LinkClass
-	linkType           LinkType
-	linkConnectionType LinkConnectionType
-	controlType        ControlType
-	wasBidirectional   bool
+	fnameParts := strings.Split(fname, ".csv")
+	fnameNodes := fmt.Sprintf(fnameParts[0] + "_macro_nodes.csv")
+	fnameLinks := fmt.Sprintf(fnameParts[0] + "_macro_links.csv")
+
+	err := net.exportNodesToCSV(fnameNodes)
+	if err != nil {
+		return errors.Wrap(err, "Can't export nodes")
+	}
+
+	err = net.exportLinksToCSV(fnameLinks)
+	if err != nil {
+		return errors.Wrap(err, "Can't export links")
+	}
+
+	return nil
 }
 
-type DirectionType uint16
+func (net *NetworkMacroscopic) exportLinksToCSV(fname string) error {
+	file, err := os.Create(fname)
+	if err != nil {
+		return errors.Wrap(err, "Can't create file")
+	}
+	defer file.Close()
 
-const (
-	DIRECTION_FORWARD = DirectionType(iota + 1)
-	DIRECTION_BACKWARD
-)
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	writer.Comma = ';'
 
-func networkLinkFromOSM(id NetworkLinkID, direction DirectionType, wayOSM *WayData, segmentNodes []*Node) *NetworkLink {
-	freeSpeed := -1.0
-	maxSpeed := -1.0
-	capacity := -1
+	err = writer.Write([]string{"id", "source_node", "target_node", "osm_way_id", "link_class", "is_link", "link_type", "control_type", "was_bidirectional", "lanes", "max_speed", "free_speed", "capacity", "length_meters", "name", "geom"})
+	if err != nil {
+		return errors.Wrap(err, "Can't write header")
+	}
 
-	if wayOSM.capacity < 0 {
-		if defaultCap, ok := defaultCapacityByLinkType[wayOSM.linkType]; ok {
-			capacity = defaultCap
+	for _, link := range net.links {
+		err = writer.Write([]string{
+			fmt.Sprintf("%d", link.ID),
+			fmt.Sprintf("%d", link.sourceNodeID),
+			fmt.Sprintf("%d", link.targetNodeID),
+			fmt.Sprintf("%d", link.osmWayID),
+			fmt.Sprintf("%s", link.linkClass),
+			fmt.Sprintf("%s", link.linkConnectionType),
+			fmt.Sprintf("%s", link.linkType),
+			fmt.Sprintf("%s", link.controlType),
+			fmt.Sprintf("%t", link.wasBidirectional),
+			fmt.Sprintf("%d", link.lanesList[0]),
+			fmt.Sprintf("%f", link.maxSpeed),
+			fmt.Sprintf("%f", link.freeSpeed),
+			fmt.Sprintf("%d", link.capacity),
+			fmt.Sprintf("%f", link.lengthMeters),
+			link.name,
+			fmt.Sprintf("%s", wkt.Marshal(link.geom)),
+		})
+		if err != nil {
+			return errors.Wrap(err, "Can't write link")
 		}
 	}
-	if wayOSM.freeSpeed < 0 {
-		if wayOSM.maxSpeed >= 0 {
-			freeSpeed = wayOSM.maxSpeed
-		} else {
-			if defaultSpeed, ok := defaultSpeedByLinkType[wayOSM.linkType]; ok {
-				freeSpeed = defaultSpeed
-				maxSpeed = defaultSpeed
-			}
-		}
-	}
-
-	link := NetworkLink{
-		name:               wayOSM.name,
-		lanesList:          make([]int, 1),
-		freeSpeed:          freeSpeed,
-		maxSpeed:           maxSpeed,
-		capacity:           capacity,
-		ID:                 id,
-		osmWayID:           wayOSM.ID,
-		linkClass:          wayOSM.linkClass,
-		linkType:           wayOSM.linkType,
-		linkConnectionType: wayOSM.linkConnectionType,
-		controlType:        NOT_SIGNAL,
-	}
-	if !wayOSM.Oneway {
-		link.wasBidirectional = true
-	}
-	if wayOSM.Oneway {
-		link.lanesList[0] = wayOSM.lanes
-	} else {
-		switch direction {
-		case DIRECTION_FORWARD:
-			if wayOSM.lanesForward > 0 {
-				link.lanesList[0] = wayOSM.lanesForward
-			} else if wayOSM.lanes > 0 {
-				link.lanesList[0] = int(math.Ceil(float64(wayOSM.lanes) / 2.0))
-			} else {
-				link.lanesList[0] = wayOSM.lanes
-			}
-		case DIRECTION_BACKWARD:
-			if wayOSM.lanesBackward >= 0 {
-				link.lanesList[0] = wayOSM.lanesBackward
-			} else if wayOSM.lanes >= 0 {
-				link.lanesList[0] = int(math.Ceil(float64(wayOSM.lanes) / 2.0))
-			} else {
-				link.lanesList[0] = wayOSM.lanes
-			}
-		default:
-			panic("Should not happen!")
-		}
-	}
-	if link.lanesList[0] <= 0 {
-		link.lanesList[0] = defaultLanesByLinkType[link.linkType]
-	}
-
-	// Walk all segment nodes except the first and the last one to detect links under traffic light control
-	for i := 1; i < len(segmentNodes)-1; i++ {
-		node := segmentNodes[i]
-		if node.controlType == IS_SIGNAL {
-			link.controlType = IS_SIGNAL
-		}
-	}
-
-	// Prepare geometry
-	link.geom = make(orb.LineString, 0, len(segmentNodes))
-	switch direction {
-	case DIRECTION_FORWARD:
-		for _, node := range segmentNodes {
-			pt := orb.Point{node.node.Lon, node.node.Lat}
-			link.geom = append(link.geom, pt)
-		}
-	case DIRECTION_BACKWARD:
-		for i := len(segmentNodes) - 1; i >= 0; i-- {
-			node := segmentNodes[i]
-			pt := orb.Point{node.node.Lon, node.node.Lat}
-			link.geom = append(link.geom, pt)
-		}
-	default:
-		panic("Should not happen!")
-	}
-
-	return &link
+	return nil
 }
 
-/* Nodes stuff */
-
-type NetworkNodeID int
-
-type NetworkNode struct {
-	name           string
-	osmHighway     string
-	ID             NetworkNodeID
-	osmNodeID      osm.NodeID
-	intersectionID int
-	controlType    ControlType
-	geom           orb.Point
-}
-
-func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
-	node := NetworkNode{
-		name:           nodeOSM.name,
-		osmHighway:     nodeOSM.highway,
-		ID:             id,
-		osmNodeID:      nodeOSM.ID,
-		intersectionID: -1,
-		controlType:    nodeOSM.controlType,
-		geom:           nodeOSM.node.Point(),
+func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
+	file, err := os.Create(fname)
+	if err != nil {
+		return errors.Wrap(err, "Can't create file")
 	}
-	return &node
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	writer.Comma = ';'
+
+	err = writer.Write([]string{"id", "osm_node_id", "control_type", "intersection_id", "osm_highway", "name", "longitude", "latitude"})
+	if err != nil {
+		return errors.Wrap(err, "Can't write header")
+	}
+
+	for _, node := range net.nodes {
+		err = writer.Write([]string{
+			fmt.Sprintf("%d", node.ID),
+			fmt.Sprintf("%d", node.osmNodeID),
+			fmt.Sprintf("%s", node.controlType),
+			fmt.Sprintf("%d", node.intersectionID),
+			node.osmHighway,
+			node.name,
+			fmt.Sprintf("%f", node.geom[0]),
+			fmt.Sprintf("%f", node.geom[1]),
+		})
+		if err != nil {
+			return errors.Wrap(err, "Can't write node")
+		}
+	}
+	return nil
 }

@@ -17,5 +17,6 @@ func TestParser(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	_ = netMacro
+
+	netMacro.ExportToCSV("network")
 }
