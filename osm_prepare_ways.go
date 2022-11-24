@@ -5,37 +5,17 @@ import (
 	"time"
 
 	"github.com/paulmach/orb"
-	"github.com/pkg/errors"
 )
 
-const (
-	DEFAULT_FIRST_VERTEX = 0
-	DEFAULT_FIRST_EDGE   = 0
-)
-
-func (data *OSMDataRaw) prepareMedium(verbose bool) error {
-	err := data.prepareWaysMedium(verbose)
-	if err != nil {
-		return errors.Wrap(err, "Can't preprocess ways")
-	}
-
-	err = data.prepareNodesMedium(verbose)
-	if err != nil {
-		return errors.Wrap(err, "Can't preprocess nodes")
-	}
-
-	return nil
-}
-
-func (data *OSMDataRaw) prepareWaysMedium(verbose bool) error {
+func (data *OSMDataRaw) prepareWays(verbose bool) error {
 
 	if verbose {
-		fmt.Printf("Cook medium ways...")
+		fmt.Printf("Prepare ways...")
 	}
 	st := time.Now()
 
-	data.waysMedium = make([]*WayData, 0, len(data.waysRaw))
-	for _, way := range data.waysRaw {
+	data.waysMedium = make([]*WayData, 0, len(data.ways))
+	for _, way := range data.ways {
 		if way.isPOI() {
 			// @todo: handle POI
 			continue
@@ -128,29 +108,27 @@ func (data *OSMDataRaw) prepareWaysMedium(verbose bool) error {
 	return nil
 }
 
-func (data *OSMDataRaw) prepareNodesMedium(verbose bool) error {
+func (data *OSMDataRaw) markPureCycles(verbose bool) error {
 	if verbose {
-		fmt.Printf("Cook medium nodes...")
+		fmt.Printf("Cook well-done ways...")
 	}
 	st := time.Now()
-	for nodeID, nodeMedium := range data.nodes {
-		if nodeMedium.useCount >= 2 || nodeMedium.controlType == IS_SIGNAL {
-			data.nodes[nodeID].isCrossing = true
+	for _, way := range data.waysMedium {
+		// Find and mark pure cycles
+		if way.isCycle {
+			way.isPureCycle = true
+			for _, nodeID := range way.Nodes {
+				if _, ok := data.nodes[nodeID]; !ok {
+					return fmt.Errorf("No such node '%d'. Way ID: '%d'", nodeID, way.ID)
+				}
+				if data.nodes[nodeID].isCrossing {
+					way.isPureCycle = false
+				}
+			}
 		}
 	}
 	if verbose {
 		fmt.Printf("Done in %v\n", time.Since(st))
 	}
 	return nil
-}
-
-func agentsIntersects(left []AgentType, right []AgentType) bool {
-	for _, l := range left {
-		for _, r := range right {
-			if l == r {
-				return true
-			}
-		}
-	}
-	return false
 }

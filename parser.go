@@ -57,18 +57,18 @@ Network parser parameters:
 	)
 }
 
-func NewParser(options ...func(*Parser)) *Parser {
-	parser := &Parser{}
+func NewParser(fileName string, options ...func(*Parser)) *Parser {
+	parser := &Parser{
+		filename:    fileName,
+		preparePOI:  false,
+		strictMode:  false,
+		startNodeID: 0,
+		startLinkID: 0,
+	}
 	for _, option := range options {
 		option(parser)
 	}
 	return parser
-}
-
-func WithFilename(filename string) func(*Parser) {
-	return func(parser *Parser) {
-		parser.filename = filename
-	}
 }
 
 func WithNetworkTypes(networkTypes []string) func(*Parser) {

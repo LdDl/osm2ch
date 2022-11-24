@@ -20,6 +20,8 @@ var (
 		AGENT_WALK: {},
 	}
 
+	agentTypesDefault = []AgentType{AGENT_AUTO}
+
 	agentsAccessIncludeValues = map[AgentType]map[AccessType]map[string]struct{}{
 		AGENT_AUTO: {
 			ACCESS_MOTOR_VEHICLE: {
@@ -112,3 +114,14 @@ var (
 		},
 	}
 )
+
+func agentsIntersects(left []AgentType, right []AgentType) bool {
+	for _, l := range left {
+		for _, r := range right {
+			if l == r {
+				return true
+			}
+		}
+	}
+	return false
+}

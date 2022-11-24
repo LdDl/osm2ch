@@ -68,7 +68,7 @@ var (
 	lanesRegExp = regexp.MustCompile(`\d+\.?\d*`)
 )
 
-func (way *WayData) flattenTags(verbose bool) {
+func (way *WayData) processTags(verbose bool) {
 	way.name = way.TagMap.Find("name")
 	way.highway = way.TagMap.Find("highway")
 	way.railway = way.TagMap.Find("railway")

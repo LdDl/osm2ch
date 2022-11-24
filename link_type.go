@@ -1,26 +1,5 @@
 package osm2ch
 
-type LinkConnectionType uint16
-
-const (
-	// Plain way
-	NOT_A_LINK = LinkConnectionType(iota)
-	// Connection between two roads
-	IS_LINK
-)
-
-type LinkClass uint16
-
-const (
-	LINK_CLASS_HIGHWAY = LinkClass(iota + 1)
-	LINK_CLASS_RAILWAY
-	LINK_CLASS_AEROWAY
-)
-
-func (iotaIdx LinkClass) String() string {
-	return [...]string{"highway", "railway", "aeroway"}[iotaIdx-1]
-}
-
 type LinkType uint16
 
 const (
@@ -67,5 +46,47 @@ var (
 		LINK_CONNECTOR:     false,
 		LINK_RAILWAY:       true,
 		LINK_AEROWAY:       true,
+	}
+	defaultLanesByLinkType = map[LinkType]int{
+		LINK_MOTORWAY:     4,
+		LINK_TRUNK:        3,
+		LINK_PRIMARY:      3,
+		LINK_SECONDARY:    2,
+		LINK_TERTIARY:     2,
+		LINK_RESIDENTIAL:  1,
+		LINK_SERVICE:      1,
+		LINK_CYCLEWAY:     1,
+		LINK_FOOTWAY:      1,
+		LINK_TRACK:        1,
+		LINK_UNCLASSIFIED: 1,
+		LINK_CONNECTOR:    2,
+	}
+	defaultSpeedByLinkType = map[LinkType]float64{
+		LINK_MOTORWAY:     120,
+		LINK_TRUNK:        100,
+		LINK_PRIMARY:      80,
+		LINK_SECONDARY:    60,
+		LINK_TERTIARY:     40,
+		LINK_RESIDENTIAL:  30,
+		LINK_SERVICE:      30,
+		LINK_CYCLEWAY:     5,
+		LINK_FOOTWAY:      5,
+		LINK_TRACK:        30,
+		LINK_UNCLASSIFIED: 30,
+		LINK_CONNECTOR:    120,
+	}
+	defaultCapacityByLinkType = map[LinkType]int{
+		LINK_MOTORWAY:     2300,
+		LINK_TRUNK:        2200,
+		LINK_PRIMARY:      1800,
+		LINK_SECONDARY:    1600,
+		LINK_TERTIARY:     1200,
+		LINK_RESIDENTIAL:  1000,
+		LINK_SERVICE:      800,
+		LINK_CYCLEWAY:     800,
+		LINK_FOOTWAY:      800,
+		LINK_TRACK:        800,
+		LINK_UNCLASSIFIED: 800,
+		LINK_CONNECTOR:    9999,
 	}
 )

@@ -24,7 +24,7 @@ type OSMScanner interface {
 type OSMDataRaw struct {
 	restrictions map[string]map[restrictionComponent]map[restrictionComponent]restrictionComponent
 	nodes        map[osm.NodeID]*Node
-	waysRaw      []*WayData
+	ways         []*WayData
 	waysMedium   []*WayData
 
 	allowedAgentTypes []AgentType
@@ -121,7 +121,7 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 				preparedWay.Nodes = append(preparedWay.Nodes, node.ID)
 			}
 			// Call tags flattening to make further processing easier
-			preparedWay.flattenTags(verbose)
+			preparedWay.processTags(verbose)
 			ways = append(ways, preparedWay)
 		}
 		err = scannerWays.Err()
@@ -327,24 +327,25 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 	}
 
 	data := OSMDataRaw{
-		waysRaw:      ways,
+		ways:         ways,
 		nodes:        nodes,
 		restrictions: restrictions,
 	}
 	if len(data.allowedAgentTypes) == 0 {
-		data.allowedAgentTypes = []AgentType{AGENT_AUTO}
+		data.allowedAgentTypes = make([]AgentType, len(agentTypesDefault))
+		copy(data.allowedAgentTypes, agentTypesDefault)
 	}
 	return &data, nil
 }
 
-func (data *OSMDataRaw) prepare(verbose bool) error {
-	err := data.prepareMedium(verbose)
+func (data *OSMDataRaw) prepareNetwork(verbose bool) error {
+	err := data.prepareWaysAndNodes(verbose)
 	if err != nil {
-		return errors.Wrap(err, "Can't cook medium")
+		return errors.Wrap(err, "Can't prepare ways or nodes")
 	}
-	err = data.prepareWellDone(verbose)
+	err = data.markPureCycles(verbose)
 	if err != nil {
-		return errors.Wrap(err, "Can't cook well-done")
+		return errors.Wrap(err, "Can't mark pure cycles")
 	}
 	err = data.prepareNodesAndLinks(verbose)
 	if err != nil {
