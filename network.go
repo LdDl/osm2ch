@@ -87,7 +87,7 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 	defer writer.Flush()
 	writer.Comma = ';'
 
-	err = writer.Write([]string{"id", "osm_node_id", "control_type", "intersection_id", "osm_highway", "name", "longitude", "latitude"})
+	err = writer.Write([]string{"id", "osm_node_id", "control_type", "boundary_type", "intersection_id", "osm_highway", "name", "longitude", "latitude"})
 	if err != nil {
 		return errors.Wrap(err, "Can't write header")
 	}
@@ -97,6 +97,7 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 			fmt.Sprintf("%d", node.ID),
 			fmt.Sprintf("%d", node.osmNodeID),
 			fmt.Sprintf("%s", node.controlType),
+			fmt.Sprintf("%s", node.boundaryType),
 			fmt.Sprintf("%d", node.intersectionID),
 			node.osmHighway,
 			node.name,

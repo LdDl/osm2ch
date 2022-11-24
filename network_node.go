@@ -16,6 +16,7 @@ type NetworkNode struct {
 	osmNodeID      osm.NodeID
 	intersectionID int
 	controlType    ControlType
+	boundaryType   BoundaryType
 	geom           orb.Point
 }
 
@@ -27,6 +28,7 @@ func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
 		osmNodeID:      nodeOSM.ID,
 		intersectionID: -1,
 		controlType:    nodeOSM.controlType,
+		boundaryType:   BOUNDARY_NONE,
 		geom:           nodeOSM.node.Point(),
 	}
 	return &node
