@@ -87,7 +87,7 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 	defer writer.Flush()
 	writer.Comma = ';'
 
-	err = writer.Write([]string{"id", "osm_node_id", "control_type", "boundary_type", "intersection_id", "osm_highway", "name", "longitude", "latitude"})
+	err = writer.Write([]string{"id", "osm_node_id", "control_type", "boundary_type", "activity_type", "zone_id", "intersection_id", "osm_highway", "name", "longitude", "latitude"})
 	if err != nil {
 		return errors.Wrap(err, "Can't write header")
 	}
@@ -98,6 +98,8 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 			fmt.Sprintf("%d", node.osmNodeID),
 			fmt.Sprintf("%s", node.controlType),
 			fmt.Sprintf("%s", node.boundaryType),
+			fmt.Sprintf("%s", node.activityType),
+			fmt.Sprintf("%d", node.zoneID),
 			fmt.Sprintf("%d", node.intersectionID),
 			node.osmHighway,
 			node.name,
@@ -107,6 +109,39 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 		if err != nil {
 			return errors.Wrap(err, "Can't write node")
 		}
+	}
+	return nil
+}
+
+func (net *NetworkMacroscopic) genActivityType() error {
+	for _, node := range net.nodes {
+		node.boundaryType = BOUNDARY_NONE
+		if node.activityType == ACTIVITY_POI {
+			continue
+		}
+		if len(node.outcomingLinks) == 0 {
+			node.boundaryType = BOUNDARY_INCOME_ONLY
+		} else if len(node.incomingLinks) == 0 {
+			node.boundaryType = BOUNDARY_OUTCOME_ONLY
+		} else if len(node.incomingLinks) == 1 && (len(node.outcomingLinks) == 1) {
+			incomingLink, ok := net.links[node.incomingLinks[0]]
+			if !ok {
+				return fmt.Errorf("No incoming link with ID '%d'. Node ID: '%d'", node.incomingLinks[0], node.ID)
+			}
+			outcomingLink, ok := net.links[node.outcomingLinks[0]]
+			if !ok {
+				return fmt.Errorf("No incoming link with ID '%d'. Node ID: '%d'", node.outcomingLinks[0], node.ID)
+			}
+			if incomingLink.sourceNodeID == outcomingLink.targetNodeID {
+				node.boundaryType = BOUNDARY_INCOME_OUTCOME
+			}
+		}
+	}
+	for _, node := range net.nodes {
+		if node.boundaryType == BOUNDARY_NONE {
+			continue
+		}
+		node.zoneID = node.ID
 	}
 	return nil
 }

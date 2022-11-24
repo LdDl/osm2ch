@@ -365,7 +365,7 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 	lastLinkID := NetworkLinkID(0)
 	lastNodeID := NetworkNodeID(0)
 
-	observed := make(map[osm.NodeID]struct{})
+	observed := make(map[osm.NodeID]NetworkNodeID)
 	nodes := make(map[NetworkNodeID]*NetworkNode)
 	links := make(map[NetworkLinkID]*NetworkLink)
 
@@ -382,26 +382,30 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 			var currentTargetNodeID NetworkNodeID
 			/* Create nodes */
 			sourceNodeID := segment[0]
-			if _, ok := observed[sourceNodeID]; !ok {
+			if nID, ok := observed[sourceNodeID]; !ok {
 				sourceNode, ok := data.nodes[sourceNodeID]
 				if !ok {
 					return nil, nil, fmt.Errorf("No such source node '%d'. Way ID: '%d'", sourceNodeID, way.ID)
 				}
 				nodes[lastNodeID] = networkNodeFromOSM(lastNodeID, sourceNode)
-				observed[sourceNodeID] = struct{}{}
+				observed[sourceNodeID] = lastNodeID
 				currentSourceNodeID = lastNodeID
 				lastNodeID++
+			} else {
+				currentSourceNodeID = nID
 			}
 			targetNodeID := segment[len(segment)-1]
-			if _, ok := observed[targetNodeID]; !ok {
+			if nID, ok := observed[targetNodeID]; !ok {
 				targetNode, ok := data.nodes[targetNodeID]
 				if !ok {
 					return nil, nil, fmt.Errorf("No such target node '%d'. Way ID: '%d'", targetNodeID, way.ID)
 				}
 				nodes[lastNodeID] = networkNodeFromOSM(lastNodeID, targetNode)
-				observed[targetNodeID] = struct{}{}
+				observed[targetNodeID] = lastNodeID
 				currentTargetNodeID = lastNodeID
 				lastNodeID++
+			} else {
+				currentTargetNodeID = nID
 			}
 
 			/* Create links */
@@ -410,9 +414,13 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 				nodesForSegment[i] = data.nodes[nodeID]
 			}
 			links[lastLinkID] = networkLinkFromOSM(lastLinkID, currentSourceNodeID, currentTargetNodeID, DIRECTION_FORWARD, way, nodesForSegment)
+			nodes[currentSourceNodeID].outcomingLinks = append(nodes[currentSourceNodeID].outcomingLinks, lastLinkID)
+			nodes[currentTargetNodeID].incomingLinks = append(nodes[currentTargetNodeID].incomingLinks, lastLinkID)
 			lastLinkID++
 			if !way.Oneway {
 				links[lastLinkID] = networkLinkFromOSM(lastLinkID, currentTargetNodeID, currentSourceNodeID, DIRECTION_BACKWARD, way, nodesForSegment)
+				nodes[currentTargetNodeID].outcomingLinks = append(nodes[currentTargetNodeID].outcomingLinks, lastLinkID)
+				nodes[currentSourceNodeID].incomingLinks = append(nodes[currentSourceNodeID].incomingLinks, lastLinkID)
 				lastLinkID++
 			}
 		}

@@ -12,11 +12,12 @@ func TestParser(t *testing.T) {
 	)
 	t.Log(parser)
 	verbose := true
+
 	netMacro, err := parser.createNetwork(verbose)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-
+	netMacro.genActivityType()
 	netMacro.ExportToCSV("network")
 }
