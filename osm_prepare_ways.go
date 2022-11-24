@@ -3,8 +3,6 @@ package osm2ch
 import (
 	"fmt"
 	"time"
-
-	"github.com/paulmach/orb"
 )
 
 func (data *OSMDataRaw) prepareWays(verbose bool) error {
@@ -61,25 +59,23 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 			way.linkConnectionType = linkInfo.linkConnectionType
 			way.linkType = linkInfo.linkType
 			way.linkClass = LINK_CLASS_HIGHWAY
-			if way.lanes <= 0 {
-				if lanes, ok := defaultLanesByLinkType[way.linkType]; ok {
-					way.lanes = lanes
-				}
-			}
+			// if way.lanes <= 0 {
+			// 	if lanes, ok := defaultLanesByLinkType[way.linkType]; ok {
+			// 		way.lanes = lanes
+			// 	}
+			// }
 
 			// Need to consider allowed tags only
 			allowedAgentTypes := way.getAllowableAgentType()
 			if !agentsIntersects(allowedAgentTypes, data.allowedAgentTypes) {
 				continue
 			}
-			way.geom = make(orb.LineString, 0, len(way.Nodes))
+			// way.geom = make(orb.LineString, 0, len(way.Nodes))
 			data.nodes[way.Nodes[0]].isCrossing = true
 			data.nodes[way.Nodes[len(way.Nodes)-1]].isCrossing = true
 			for _, nodeID := range way.Nodes {
-				if node, ok := data.nodes[nodeID]; ok {
+				if _, ok := data.nodes[nodeID]; ok {
 					data.nodes[nodeID].useCount++
-					pt := orb.Point{node.node.Lon, node.node.Lat}
-					way.geom = append(way.geom, pt)
 				} else {
 					return fmt.Errorf("No such node '%d'. Way ID: '%d'", nodeID, way.ID)
 				}

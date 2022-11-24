@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/paulmach/orb"
 	"github.com/paulmach/osm"
 )
 
@@ -17,7 +16,6 @@ type Way struct {
 }
 
 type WayData struct {
-	// Flatten tags
 	name              string
 	highway           string
 	railway           string
@@ -36,30 +34,27 @@ type WayData struct {
 	turnLanes         string
 	turnLanesForward  string
 	turnLanesBackward string
-	/* Main information */
-	TagMap             osm.Tags
+	TagMap            osm.Tags
+	// geom               orb.LineString
 	Nodes              []osm.NodeID
-	ID                 osm.WayID
-	osmTargetNodeID    osm.NodeID         // Medium
-	osmSourceNodeID    osm.NodeID         // Medium
-	isCycle            bool               // Medium
-	isPureCycle        bool               // Well-done
-	linkClass          LinkClass          // Medium
-	linkType           LinkType           // Medium
-	linkConnectionType LinkConnectionType // Medium
-	geom               orb.LineString     // Medium
-	capacity           int                // Well-done
-	freeSpeed          float64            // Well-done
-	maxSpeed           float64
-	lanes              int
-	lanesForward       int
+	segments           [][]osm.NodeID
+	osmSourceNodeID    osm.NodeID
 	lanesBackward      int
+	lanesForward       int
+	lanes              int
+	maxSpeed           float64
+	capacity           int
+	ID                 osm.WayID
+	freeSpeed          float64
+	osmTargetNodeID    osm.NodeID
+	linkConnectionType LinkConnectionType
+	linkType           LinkType
+	linkClass          LinkClass
+	isPureCycle        bool
+	isCycle            bool
 	Oneway             bool
 	OnewayDefault      bool
 	IsReversed         bool
-
-	segments    [][]osm.NodeID
-	segmentsNum int
 }
 
 var (
@@ -155,6 +150,7 @@ func (way *WayData) processTags(verbose bool) {
 	way.building = way.TagMap.Find("building")
 	way.amenity = way.TagMap.Find("amenity")
 	way.leisure = way.TagMap.Find("leisure")
+
 }
 
 func (way *WayData) isPOI() bool {

@@ -12,6 +12,7 @@ type Node struct {
 	useCount    int
 	controlType ControlType
 	isCrossing  bool
+	highway     string
 }
 
 type ControlType uint16

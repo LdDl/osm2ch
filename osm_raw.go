@@ -110,6 +110,8 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 				TagMap:        make(osm.Tags, len(way.Tags)),
 
 				maxSpeed:      -1.0,
+				freeSpeed:     -1.0,
+				capacity:      -1.0,
 				lanes:         -1,
 				lanesForward:  -1,
 				lanesBackward: -1,
@@ -183,6 +185,7 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 					useCount:    0,
 					isCrossing:  false,
 					controlType: controlType,
+					highway:     highwayText,
 				}
 			}
 		}
@@ -338,29 +341,34 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 	return &data, nil
 }
 
-func (data *OSMDataRaw) prepareNetwork(verbose bool) error {
+func (data *OSMDataRaw) prepareNetwork(verbose bool) (*NetworkMacroscopic, error) {
 	err := data.prepareWaysAndNodes(verbose)
 	if err != nil {
-		return errors.Wrap(err, "Can't prepare ways or nodes")
+		return nil, errors.Wrap(err, "Can't prepare ways or nodes")
 	}
 	err = data.markPureCycles(verbose)
 	if err != nil {
-		return errors.Wrap(err, "Can't mark pure cycles")
+		return nil, errors.Wrap(err, "Can't mark pure cycles")
 	}
-	err = data.prepareNodesAndLinks(verbose)
+	nodes, links, err := data.prepareNodesAndLinks(verbose)
 	if err != nil {
-		return errors.Wrap(err, "Can't prepare links")
+		return nil, errors.Wrap(err, "Can't prepare links")
 	}
-	return nil
+	net := NetworkMacroscopic{
+		nodes: nodes,
+		links: links,
+	}
+	return &net, nil
 }
 
-func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) error {
-	lastLinkID := 0
-	lastNodeID := 0
+func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*NetworkNode, map[NetworkLinkID]*NetworkLink, error) {
+	lastLinkID := NetworkLinkID(0)
+	lastNodeID := NetworkNodeID(0)
 
 	observed := make(map[osm.NodeID]struct{})
-	nodes := make(map[int]struct{})
-	links := make(map[int]struct{})
+	nodes := make(map[NetworkNodeID]*NetworkNode)
+	links := make(map[NetworkLinkID]*NetworkLink)
+
 	for _, way := range data.waysMedium {
 		if way.isPureCycle {
 			continue
@@ -372,39 +380,40 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) error {
 			}
 			/* Create nodes */
 			sourceNodeID := segment[0]
-			targetNodeID := segment[len(segment)-1]
-			sourceNode, ok := data.nodes[sourceNodeID]
-			if !ok {
-				return fmt.Errorf("No such source node '%d'. Way ID: '%d'", sourceNodeID, way.ID)
-			}
 			if _, ok := observed[sourceNodeID]; !ok {
-				_ = sourceNode
-				nodes[lastNodeID] = struct{}{}
+				sourceNode, ok := data.nodes[sourceNodeID]
+				if !ok {
+					return nil, nil, fmt.Errorf("No such source node '%d'. Way ID: '%d'", sourceNodeID, way.ID)
+				}
+				nodes[lastNodeID] = networkNodeFromOSM(lastNodeID, sourceNode)
 				observed[sourceNodeID] = struct{}{}
 				lastNodeID++
 			}
-			targetNode, ok := data.nodes[targetNodeID]
-			if !ok {
-				return fmt.Errorf("No such target node '%d'. Way ID: '%d'", targetNodeID, way.ID)
-			}
+			targetNodeID := segment[len(segment)-1]
 			if _, ok := observed[targetNodeID]; !ok {
-				_ = targetNode
-				nodes[lastNodeID] = struct{}{}
+				targetNode, ok := data.nodes[targetNodeID]
+				if !ok {
+					return nil, nil, fmt.Errorf("No such target node '%d'. Way ID: '%d'", targetNodeID, way.ID)
+				}
+				nodes[lastNodeID] = networkNodeFromOSM(lastNodeID, targetNode)
 				observed[targetNodeID] = struct{}{}
 				lastNodeID++
 			}
+
 			/* Create links */
-			links[lastLinkID] = struct{}{}
+			nodesForSegment := make([]*Node, len(segment))
+			for i, nodeID := range segment {
+				nodesForSegment[i] = data.nodes[nodeID]
+			}
+			links[lastLinkID] = networkLinkFromOSM(lastLinkID, DIRECTION_FORWARD, way, nodesForSegment)
 			lastLinkID++
 			if !way.Oneway {
-				links[lastLinkID] = struct{}{}
+				links[lastLinkID] = networkLinkFromOSM(lastLinkID, DIRECTION_BACKWARD, way, nodesForSegment)
 				lastLinkID++
 			}
 		}
 	}
-	fmt.Println("Links", len(links), lastLinkID)
-	fmt.Println("Nodes", len(nodes), lastNodeID)
-	return nil
+	return nodes, links, nil
 }
 
 func (way *WayData) prepareSegments(nodes map[osm.NodeID]*Node) {
@@ -423,7 +432,6 @@ func (way *WayData) prepareSegments(nodes map[osm.NodeID]*Node) {
 			}
 		}
 		way.segments = append(way.segments, segmentNodes)
-		way.segmentsNum++
 		if idx == nodesNum-1 {
 			break
 		}
