@@ -19,5 +19,6 @@ func TestParser(t *testing.T) {
 		return
 	}
 	netMacro.genActivityType()
+	netMacro.genMovement()
 	netMacro.ExportToCSV("network")
 }

@@ -14,6 +14,7 @@ type NetworkLinkID int
 type NetworkLink struct {
 	name               string
 	geom               orb.LineString
+	geomEuclidean      orb.LineString
 	lanesList          []int
 	lengthMeters       float64
 	freeSpeed          float64
@@ -135,4 +136,8 @@ func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNode
 	}
 	link.lengthMeters = geo.LengthHaversign(link.geom)
 	return &link
+}
+
+func (link *NetworkLink) GetLanes() int {
+	return link.lanesList[0]
 }

@@ -354,6 +354,12 @@ func (data *OSMDataRaw) prepareNetwork(verbose bool) (*NetworkMacroscopic, error
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't prepare links")
 	}
+	for _, link := range links {
+		link.geomEuclidean = lineToEuclidean(link.geom)
+	}
+	for _, node := range nodes {
+		node.geomEuclidean = pointToEuclidean(node.geom)
+	}
 	net := NetworkMacroscopic{
 		nodes: nodes,
 		links: links,

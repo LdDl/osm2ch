@@ -66,7 +66,7 @@ func (net *NetworkMacroscopic) exportLinksToCSV(fname string) error {
 			fmt.Sprintf("%s", link.controlType),
 			strings.Join(allowedAgentTypes, ","),
 			fmt.Sprintf("%t", link.wasBidirectional),
-			fmt.Sprintf("%d", link.lanesList[0]),
+			fmt.Sprintf("%d", link.GetLanes()),
 			fmt.Sprintf("%f", link.maxSpeed),
 			fmt.Sprintf("%f", link.freeSpeed),
 			fmt.Sprintf("%d", link.capacity),
@@ -202,6 +202,16 @@ func (net *NetworkMacroscopic) genActivityType() error {
 			continue
 		}
 		node.zoneID = node.ID
+	}
+	return nil
+}
+
+func (net *NetworkMacroscopic) genMovement() error {
+	mvmtID := MovementID(0)
+	for _, node := range net.nodes {
+		if ok := node.genMovement(mvmtID, net.links); ok {
+			mvmtID++
+		}
 	}
 	return nil
 }

@@ -24,6 +24,7 @@ type NetworkNode struct {
 	activityType     ActivityType
 	activityLinkType LinkType
 	geom             orb.Point
+	geomEuclidean    orb.Point
 }
 
 func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
@@ -43,4 +44,59 @@ func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
 		geom:           nodeOSM.node.Point(),
 	}
 	return &node
+}
+
+type MovementID int
+
+// genMovement generates Movement
+func (node *NetworkNode) genMovement(movementID MovementID, links map[NetworkLinkID]*NetworkLink) bool {
+	income := len(node.incomingLinks)
+	outcome := len(node.outcomingLinks)
+	if income == 0 || outcome == 0 {
+		return false
+	}
+	if outcome == 1 {
+		incomingLinksList := []NetworkLinkID{}
+		outcomingLinkID := node.outcomingLinks[0]
+		if outcomingLink, ok := links[outcomingLinkID]; ok {
+			for _, incomingLinkID := range node.incomingLinks {
+				if incomingLink, ok := links[incomingLinkID]; ok {
+					if incomingLink.sourceNodeID != outcomingLink.targetNodeID { // Ignore all reverse directions
+						incomingLinksList = append(incomingLinksList, incomingLinkID)
+					}
+				} else {
+					return false
+				}
+			}
+		}
+		if len(incomingLinksList) == 0 {
+			return false
+		}
+		// @todo: handle
+	} else {
+		for _, incomingLinkID := range node.incomingLinks {
+			if incomingLink, ok := links[incomingLinkID]; ok {
+				outcomingLinksList := []*NetworkLink{}
+				for _, outcomingLinkID := range node.outcomingLinks {
+					if outcomingLink, ok := links[outcomingLinkID]; ok {
+						if incomingLink.sourceNodeID != outcomingLink.targetNodeID { // Ignore all reverse directions
+							outcomingLinksList = append(outcomingLinksList, outcomingLink)
+						}
+					} else {
+						return false
+					}
+				}
+				if len(outcomingLinksList) == 0 {
+					return false
+				}
+				// @todo: handle
+				connections := getIntersectionsConnections(incomingLink, outcomingLinksList)
+				_ = connections
+			} else {
+				return false
+			}
+		}
+	}
+
+	return true
 }
