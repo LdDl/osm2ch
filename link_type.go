@@ -18,10 +18,12 @@ const (
 	LINK_CONNECTOR
 	LINK_RAILWAY
 	LINK_AEROWAY
+
+	LINK_UNDEFINED = LinkType(0)
 )
 
 func (iotaIdx LinkType) String() string {
-	return [...]string{"motorway", "trunk", "primary", "secondary", "tertiary", "residential", "living_street", "service", "cycleway", "footway", "track", "unclassified", "connector", "railway", "aeroway"}[iotaIdx-1]
+	return [...]string{"undefined", "motorway", "trunk", "primary", "secondary", "tertiary", "residential", "living_street", "service", "cycleway", "footway", "track", "unclassified", "connector", "railway", "aeroway"}[iotaIdx]
 }
 
 type linkComposition struct {

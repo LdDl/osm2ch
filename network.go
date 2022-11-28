@@ -87,7 +87,7 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 	defer writer.Flush()
 	writer.Comma = ';'
 
-	err = writer.Write([]string{"id", "osm_node_id", "control_type", "boundary_type", "activity_type", "zone_id", "intersection_id", "osm_highway", "name", "longitude", "latitude"})
+	err = writer.Write([]string{"id", "osm_node_id", "control_type", "boundary_type", "activity_type", "activity_link_type", "zone_id", "intersection_id", "poi_id", "osm_highway", "name", "longitude", "latitude"})
 	if err != nil {
 		return errors.Wrap(err, "Can't write header")
 	}
@@ -99,8 +99,10 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 			fmt.Sprintf("%s", node.controlType),
 			fmt.Sprintf("%s", node.boundaryType),
 			fmt.Sprintf("%s", node.activityType),
+			fmt.Sprintf("%s", node.activityLinkType),
 			fmt.Sprintf("%d", node.zoneID),
 			fmt.Sprintf("%d", node.intersectionID),
+			fmt.Sprintf("%d", node.poiID),
 			node.osmHighway,
 			node.name,
 			fmt.Sprintf("%f", node.geom[0]),
@@ -114,6 +116,64 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 }
 
 func (net *NetworkMacroscopic) genActivityType() error {
+	// 6. Бежим по узлам
+	// 7. Для каждого узла проверяем, является ли он POI. Если да, то пропускаем итерацию. Если нет, идём дальше.
+	// 8. Ищем по счётчикам типов линков для каждого узла максимальный счётчик.
+	// 9. Проставляем узлу activity_type по типу линка, чей счетчик для данного узла максимальный.
+
+	nodesLinkTypesCounters := make(map[NetworkNodeID]map[LinkType]int)
+	for _, link := range net.links {
+		sourceNodeID := link.sourceNodeID
+		if _, ok := net.nodes[sourceNodeID]; !ok {
+			return fmt.Errorf("No source node with ID '%d'. Link ID: '%d'", sourceNodeID, link.ID)
+		}
+		if _, ok := nodesLinkTypesCounters[sourceNodeID]; !ok {
+			nodesLinkTypesCounters[sourceNodeID] = make(map[LinkType]int)
+		}
+		if _, ok := nodesLinkTypesCounters[sourceNodeID][link.linkType]; !ok {
+			nodesLinkTypesCounters[sourceNodeID][link.linkType] = 1
+		} else {
+			nodesLinkTypesCounters[sourceNodeID][link.linkType]++
+		}
+
+		targetNodeID := link.targetNodeID
+		if _, ok := net.nodes[targetNodeID]; !ok {
+			return fmt.Errorf("No target node with ID '%d'. Link ID: '%d'", targetNodeID, link.ID)
+		}
+		if _, ok := nodesLinkTypesCounters[targetNodeID]; !ok {
+			nodesLinkTypesCounters[targetNodeID] = make(map[LinkType]int)
+		}
+		if _, ok := nodesLinkTypesCounters[targetNodeID][link.linkType]; !ok {
+			nodesLinkTypesCounters[targetNodeID][link.linkType] = 1
+		} else {
+			nodesLinkTypesCounters[targetNodeID][link.linkType]++
+		}
+	}
+
+	for nodeID, node := range net.nodes {
+		if node.poiID > -1 {
+			node.activityType = ACTIVITY_POI
+			node.activityLinkType = LINK_UNDEFINED
+		}
+		if linkTypesCounters, ok := nodesLinkTypesCounters[nodeID]; ok {
+			maxLinkType := LINK_UNDEFINED
+			maxLinkTypeCount := 0
+			for linkType, counter := range linkTypesCounters {
+				if counter > maxLinkTypeCount {
+					maxLinkTypeCount = counter
+					maxLinkType = linkType
+				}
+			}
+			if maxLinkType > 0 {
+				node.activityType = ACTIVITY_LINK
+				node.activityLinkType = maxLinkType
+			} else {
+				node.activityType = ACTIVITY_NONE
+				node.activityLinkType = LINK_UNDEFINED
+			}
+		}
+	}
+
 	for _, node := range net.nodes {
 		node.boundaryType = BOUNDARY_NONE
 		if node.activityType == ACTIVITY_POI {
