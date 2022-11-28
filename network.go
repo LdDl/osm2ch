@@ -45,12 +45,16 @@ func (net *NetworkMacroscopic) exportLinksToCSV(fname string) error {
 	defer writer.Flush()
 	writer.Comma = ';'
 
-	err = writer.Write([]string{"id", "source_node", "target_node", "osm_way_id", "link_class", "is_link", "link_type", "control_type", "was_bidirectional", "lanes", "max_speed", "free_speed", "capacity", "length_meters", "name", "geom"})
+	err = writer.Write([]string{"id", "source_node", "target_node", "osm_way_id", "link_class", "is_link", "link_type", "control_type", "allowed_agent_types", "was_bidirectional", "lanes", "max_speed", "free_speed", "capacity", "length_meters", "name", "geom"})
 	if err != nil {
 		return errors.Wrap(err, "Can't write header")
 	}
 
 	for _, link := range net.links {
+		allowedAgentTypes := make([]string, len(link.allowedAgentTypes))
+		for i, agentType := range link.allowedAgentTypes {
+			allowedAgentTypes[i] = fmt.Sprintf("%s", agentType)
+		}
 		err = writer.Write([]string{
 			fmt.Sprintf("%d", link.ID),
 			fmt.Sprintf("%d", link.sourceNodeID),
@@ -60,6 +64,7 @@ func (net *NetworkMacroscopic) exportLinksToCSV(fname string) error {
 			fmt.Sprintf("%s", link.linkConnectionType),
 			fmt.Sprintf("%s", link.linkType),
 			fmt.Sprintf("%s", link.controlType),
+			strings.Join(allowedAgentTypes, ","),
 			fmt.Sprintf("%t", link.wasBidirectional),
 			fmt.Sprintf("%d", link.lanesList[0]),
 			fmt.Sprintf("%f", link.maxSpeed),

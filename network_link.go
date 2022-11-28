@@ -25,6 +25,7 @@ type NetworkLink struct {
 	linkType           LinkType
 	linkConnectionType LinkConnectionType
 	controlType        ControlType
+	allowedAgentTypes  []AgentType
 	sourceNodeID       NetworkNodeID
 	targetNodeID       NetworkNodeID
 	wasBidirectional   bool
@@ -72,7 +73,10 @@ func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNode
 		sourceNodeID:       sourceNodeID,
 		targetNodeID:       targetNodeID,
 		controlType:        NOT_SIGNAL,
+		allowedAgentTypes:  make([]AgentType, len(wayOSM.allowedAgentTypes)),
 	}
+	copy(link.allowedAgentTypes, wayOSM.allowedAgentTypes)
+
 	if !wayOSM.Oneway {
 		link.wasBidirectional = true
 	}

@@ -36,6 +36,7 @@ type WayData struct {
 	turnLanesBackward string
 	TagMap            osm.Tags
 	// geom               orb.LineString
+	allowedAgentTypes  []AgentType
 	Nodes              []osm.NodeID
 	segments           [][]osm.NodeID
 	osmSourceNodeID    osm.NodeID

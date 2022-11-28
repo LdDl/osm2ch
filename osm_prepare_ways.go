@@ -67,8 +67,13 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 
 			// Need to consider allowed tags only
 			allowedAgentTypes := way.getAllowableAgentType()
-			if !agentsIntersects(allowedAgentTypes, data.allowedAgentTypes) {
+			agentsIntersection := agentsIntersection(allowedAgentTypes, data.allowedAgentTypes)
+			if len(agentsIntersection) == 0 {
 				continue
+			}
+			way.allowedAgentTypes = make([]AgentType, 0, len(agentsIntersection))
+			for agentType := range agentsIntersection {
+				way.allowedAgentTypes = append(way.allowedAgentTypes, agentType)
 			}
 			// way.geom = make(orb.LineString, 0, len(way.Nodes))
 			data.nodes[way.Nodes[0]].isCrossing = true

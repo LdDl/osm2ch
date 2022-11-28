@@ -125,3 +125,15 @@ func agentsIntersects(left []AgentType, right []AgentType) bool {
 	}
 	return false
 }
+
+func agentsIntersection(left []AgentType, right []AgentType) map[AgentType]struct{} {
+	intersection := make(map[AgentType]struct{})
+	for _, l := range left {
+		for _, r := range right {
+			if l == r {
+				intersection[l] = struct{}{}
+			}
+		}
+	}
+	return intersection
+}
