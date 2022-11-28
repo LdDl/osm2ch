@@ -116,11 +116,6 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 }
 
 func (net *NetworkMacroscopic) genActivityType() error {
-	// 6. Бежим по узлам
-	// 7. Для каждого узла проверяем, является ли он POI. Если да, то пропускаем итерацию. Если нет, идём дальше.
-	// 8. Ищем по счётчикам типов линков для каждого узла максимальный счётчик.
-	// 9. Проставляем узлу activity_type по типу линка, чей счетчик для данного узла максимальный.
-
 	nodesLinkTypesCounters := make(map[NetworkNodeID]map[LinkType]int)
 	for _, link := range net.links {
 		sourceNodeID := link.sourceNodeID
