@@ -36,7 +36,7 @@ func lineToEuclidean(line orb.LineString) orb.LineString {
 	return newLine
 }
 
-// angleBetweenLines find angle between two lines
+// angleBetweenLines returs angle between two lines
 //
 // Note: panics if number of points in any line is less than 2
 //

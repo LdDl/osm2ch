@@ -46,10 +46,11 @@ func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
 	return &node
 }
 
-type MovementID int
-
 // genMovement generates Movement
-func (node *NetworkNode) genMovement(movementID MovementID, links map[NetworkLinkID]*NetworkLink) bool {
+func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLinkID]*NetworkLink) bool {
+	if movementID == nil {
+		return false
+	}
 	income := len(node.incomingLinks)
 	outcome := len(node.outcomingLinks)
 	if income == 0 || outcome == 0 {
@@ -89,14 +90,36 @@ func (node *NetworkNode) genMovement(movementID MovementID, links map[NetworkLin
 				if len(outcomingLinksList) == 0 {
 					return false
 				}
-				// @todo: handle
 				connections := getIntersectionsConnections(incomingLink, outcomingLinksList)
-				_ = connections
+				for i, outcomingLink := range outcomingLinksList {
+					incomeLaneStart := connections[i][0].first + 1
+					incomeLaneEnd := connections[i][0].second + 1
+					outcomeLaneStart := connections[i][1].first + 1
+					outcomeLaneEnd := connections[i][1].second + 1
+					lanesNum := incomeLaneEnd - incomeLaneStart + 1
+					allowedAgentTypes := make([]AgentType, len(incomingLink.allowedAgentTypes))
+					copy(allowedAgentTypes, incomingLink.allowedAgentTypes)
+					mvmt := Movement{
+						ID:                *movementID,
+						NodeID:            node.ID,
+						IncomingLinkID:    incomingLinkID,
+						OutcomingLinkID:   outcomingLink.ID,
+						incomeLaneStart:   incomeLaneStart,
+						incomeLaneEnd:     incomeLaneEnd,
+						outcomeLaneStart:  outcomeLaneStart,
+						outcomeLaneEnd:    outcomeLaneEnd,
+						lanesNum:          lanesNum,
+						controlType:       node.controlType,
+						allowedAgentTypes: allowedAgentTypes,
+					}
+					mvmt.movementCompositeType, mvmt.movementType = movementBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
+					mvmt.geom = movementGeomBetweenLines(incomingLink.geom, outcomingLink.geom)
+					*movementID++
+				}
 			} else {
 				return false
 			}
 		}
 	}
-
 	return true
 }

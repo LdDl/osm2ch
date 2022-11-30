@@ -209,8 +209,8 @@ func (net *NetworkMacroscopic) genActivityType() error {
 func (net *NetworkMacroscopic) genMovement() error {
 	mvmtID := MovementID(0)
 	for _, node := range net.nodes {
-		if ok := node.genMovement(mvmtID, net.links); ok {
-			mvmtID++
+		if ok := node.genMovement(&mvmtID, net.links); ok {
+			// mvmtID++
 		}
 	}
 	return nil

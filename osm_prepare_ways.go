@@ -109,7 +109,7 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 
 func (data *OSMDataRaw) markPureCycles(verbose bool) error {
 	if verbose {
-		fmt.Printf("Cook well-done ways...")
+		fmt.Printf("Inspect pure cycles...")
 	}
 	st := time.Now()
 	for _, way := range data.waysMedium {
