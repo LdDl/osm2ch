@@ -361,8 +361,9 @@ func (data *OSMDataRaw) prepareNetwork(verbose bool) (*NetworkMacroscopic, error
 		node.geomEuclidean = pointToEuclidean(node.geom)
 	}
 	net := NetworkMacroscopic{
-		nodes: nodes,
-		links: links,
+		nodes:    nodes,
+		links:    links,
+		movement: make(map[MovementID]*Movement),
 	}
 	return &net, nil
 }

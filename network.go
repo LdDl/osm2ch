@@ -11,8 +11,9 @@ import (
 )
 
 type NetworkMacroscopic struct {
-	links map[NetworkLinkID]*NetworkLink
-	nodes map[NetworkNodeID]*NetworkNode
+	links    map[NetworkLinkID]*NetworkLink
+	nodes    map[NetworkNodeID]*NetworkNode
+	movement map[MovementID]*Movement
 }
 
 func (net *NetworkMacroscopic) ExportToCSV(fname string) error {
@@ -209,8 +210,9 @@ func (net *NetworkMacroscopic) genActivityType() error {
 func (net *NetworkMacroscopic) genMovement() error {
 	mvmtID := MovementID(0)
 	for _, node := range net.nodes {
-		if ok := node.genMovement(&mvmtID, net.links); ok {
-			// mvmtID++
+		mvmtList := node.genMovement(&mvmtID, net.links)
+		for _, mvmt := range mvmtList {
+			net.movement[mvmtID] = &mvmt
 		}
 	}
 	return nil

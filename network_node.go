@@ -47,15 +47,18 @@ func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
 }
 
 // genMovement generates Movement
-func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLinkID]*NetworkLink) bool {
+func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLinkID]*NetworkLink) []Movement {
+	response := []Movement{}
+
 	if movementID == nil {
-		return false
+		return response
 	}
 	income := len(node.incomingLinks)
 	outcome := len(node.outcomingLinks)
 	if income == 0 || outcome == 0 {
-		return false
+		return response
 	}
+
 	if outcome == 1 {
 		incomingLinksList := []*NetworkLink{}
 		outcomingLinkID := node.outcomingLinks[0]
@@ -67,12 +70,12 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 						incomingLinksList = append(incomingLinksList, incomingLink)
 					}
 				} else {
-					return false
+					return response
 				}
 			}
 		}
 		if len(incomingLinksList) == 0 {
-			return false
+			return response
 		}
 
 		connections := getSpansConnections(outcomingLink, incomingLinksList)
@@ -100,6 +103,7 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 			mvmt.movementCompositeType, mvmt.movementType = movementBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
 			mvmt.geom = movementGeomBetweenLines(incomingLink.geom, outcomingLink.geom)
 			*movementID++
+			response = append(response, mvmt)
 		}
 	} else {
 		for _, incomingLinkID := range node.incomingLinks {
@@ -111,11 +115,11 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 							outcomingLinksList = append(outcomingLinksList, outcomingLink)
 						}
 					} else {
-						return false
+						return response
 					}
 				}
 				if len(outcomingLinksList) == 0 {
-					return false
+					return response
 				}
 				connections := getIntersectionsConnections(incomingLink, outcomingLinksList)
 				for i, outcomingLink := range outcomingLinksList {
@@ -142,11 +146,12 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 					mvmt.movementCompositeType, mvmt.movementType = movementBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
 					mvmt.geom = movementGeomBetweenLines(incomingLink.geom, outcomingLink.geom)
 					*movementID++
+					response = append(response, mvmt)
 				}
 			} else {
-				return false
+				return response
 			}
 		}
 	}
-	return true
+	return response
 }
