@@ -420,12 +420,12 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 			for i, nodeID := range segment {
 				nodesForSegment[i] = data.nodes[nodeID]
 			}
-			links[lastLinkID] = networkLinkFromOSM(lastLinkID, currentSourceNodeID, currentTargetNodeID, DIRECTION_FORWARD, way, nodesForSegment)
+			links[lastLinkID] = networkLinkFromOSM(lastLinkID, currentSourceNodeID, currentTargetNodeID, nodes[currentSourceNodeID].osmNodeID, nodes[currentTargetNodeID].osmNodeID, DIRECTION_FORWARD, way, nodesForSegment)
 			nodes[currentSourceNodeID].outcomingLinks = append(nodes[currentSourceNodeID].outcomingLinks, lastLinkID)
 			nodes[currentTargetNodeID].incomingLinks = append(nodes[currentTargetNodeID].incomingLinks, lastLinkID)
 			lastLinkID++
 			if !way.Oneway {
-				links[lastLinkID] = networkLinkFromOSM(lastLinkID, currentTargetNodeID, currentSourceNodeID, DIRECTION_BACKWARD, way, nodesForSegment)
+				links[lastLinkID] = networkLinkFromOSM(lastLinkID, currentTargetNodeID, currentSourceNodeID, nodes[currentTargetNodeID].osmNodeID, nodes[currentSourceNodeID].osmNodeID, DIRECTION_BACKWARD, way, nodesForSegment)
 				nodes[currentTargetNodeID].outcomingLinks = append(nodes[currentTargetNodeID].outcomingLinks, lastLinkID)
 				nodes[currentSourceNodeID].incomingLinks = append(nodes[currentSourceNodeID].incomingLinks, lastLinkID)
 				lastLinkID++

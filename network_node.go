@@ -47,8 +47,8 @@ func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
 }
 
 // genMovement generates Movement
-func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLinkID]*NetworkLink) []Movement {
-	response := []Movement{}
+func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLinkID]*NetworkLink) []*Movement {
+	response := []*Movement{}
 
 	if movementID == nil {
 		return response
@@ -90,6 +90,7 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 			mvmt := Movement{
 				ID:                *movementID,
 				NodeID:            node.ID,
+				osmNodeID:         node.osmNodeID,
 				IncomingLinkID:    incomingLink.ID,
 				OutcomingLinkID:   outcomingLink.ID,
 				incomeLaneStart:   incomeLaneStart,
@@ -97,13 +98,15 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 				outcomeLaneStart:  outcomeLaneStart,
 				outcomeLaneEnd:    outcomeLaneEnd,
 				lanesNum:          lanesNum,
+				fromOsmNodeID:     incomingLink.sourceOsmNodeID,
+				toOsmNodeID:       outcomingLink.targetOsmNodeID,
 				controlType:       node.controlType,
 				allowedAgentTypes: allowedAgentTypes,
 			}
 			mvmt.movementCompositeType, mvmt.movementType = movementBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
 			mvmt.geom = movementGeomBetweenLines(incomingLink.geom, outcomingLink.geom)
 			*movementID++
-			response = append(response, mvmt)
+			response = append(response, &mvmt)
 		}
 	} else {
 		for _, incomingLinkID := range node.incomingLinks {
@@ -130,9 +133,11 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 					lanesNum := incomeLaneEnd - incomeLaneStart + 1
 					allowedAgentTypes := make([]AgentType, len(incomingLink.allowedAgentTypes))
 					copy(allowedAgentTypes, incomingLink.allowedAgentTypes)
+
 					mvmt := Movement{
 						ID:                *movementID,
 						NodeID:            node.ID,
+						osmNodeID:         node.osmNodeID,
 						IncomingLinkID:    incomingLinkID,
 						OutcomingLinkID:   outcomingLink.ID,
 						incomeLaneStart:   incomeLaneStart,
@@ -140,13 +145,16 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 						outcomeLaneStart:  outcomeLaneStart,
 						outcomeLaneEnd:    outcomeLaneEnd,
 						lanesNum:          lanesNum,
+						fromOsmNodeID:     incomingLink.sourceOsmNodeID,
+						toOsmNodeID:       outcomingLink.targetOsmNodeID,
 						controlType:       node.controlType,
 						allowedAgentTypes: allowedAgentTypes,
 					}
 					mvmt.movementCompositeType, mvmt.movementType = movementBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
 					mvmt.geom = movementGeomBetweenLines(incomingLink.geom, outcomingLink.geom)
 					*movementID++
-					response = append(response, mvmt)
+					response = append(response, &mvmt)
+
 				}
 			} else {
 				return response

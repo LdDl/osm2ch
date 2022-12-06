@@ -21,6 +21,7 @@ func (net *NetworkMacroscopic) ExportToCSV(fname string) error {
 	fnameParts := strings.Split(fname, ".csv")
 	fnameNodes := fmt.Sprintf(fnameParts[0] + "_macro_nodes.csv")
 	fnameLinks := fmt.Sprintf(fnameParts[0] + "_macro_links.csv")
+	fnameMovement := fmt.Sprintf(fnameParts[0] + "_movement.csv")
 
 	err := net.exportNodesToCSV(fnameNodes)
 	if err != nil {
@@ -30,6 +31,11 @@ func (net *NetworkMacroscopic) ExportToCSV(fname string) error {
 	err = net.exportLinksToCSV(fnameLinks)
 	if err != nil {
 		return errors.Wrap(err, "Can't export links")
+	}
+
+	err = net.exportMovementToCSV(fnameMovement)
+	if err != nil {
+		return errors.Wrap(err, "Can't export movement")
 	}
 
 	return nil
@@ -73,7 +79,7 @@ func (net *NetworkMacroscopic) exportLinksToCSV(fname string) error {
 			fmt.Sprintf("%d", link.capacity),
 			fmt.Sprintf("%f", link.lengthMeters),
 			link.name,
-			fmt.Sprintf("%s", wkt.Marshal(link.geom)),
+			fmt.Sprintf("%s", wkt.MarshalString(link.geom)),
 		})
 		if err != nil {
 			return errors.Wrap(err, "Can't write link")
@@ -121,98 +127,53 @@ func (net *NetworkMacroscopic) exportNodesToCSV(fname string) error {
 	return nil
 }
 
-func (net *NetworkMacroscopic) genActivityType() error {
-	nodesLinkTypesCounters := make(map[NetworkNodeID]map[LinkType]int)
-	for _, link := range net.links {
-		sourceNodeID := link.sourceNodeID
-		if _, ok := net.nodes[sourceNodeID]; !ok {
-			return fmt.Errorf("No source node with ID '%d'. Link ID: '%d'", sourceNodeID, link.ID)
-		}
-		if _, ok := nodesLinkTypesCounters[sourceNodeID]; !ok {
-			nodesLinkTypesCounters[sourceNodeID] = make(map[LinkType]int)
-		}
-		if _, ok := nodesLinkTypesCounters[sourceNodeID][link.linkType]; !ok {
-			nodesLinkTypesCounters[sourceNodeID][link.linkType] = 1
-		} else {
-			nodesLinkTypesCounters[sourceNodeID][link.linkType]++
-		}
+func (net *NetworkMacroscopic) exportMovementToCSV(fname string) error {
+	file, err := os.Create(fname)
+	if err != nil {
+		return errors.Wrap(err, "Can't create file")
+	}
+	defer file.Close()
 
-		targetNodeID := link.targetNodeID
-		if _, ok := net.nodes[targetNodeID]; !ok {
-			return fmt.Errorf("No target node with ID '%d'. Link ID: '%d'", targetNodeID, link.ID)
-		}
-		if _, ok := nodesLinkTypesCounters[targetNodeID]; !ok {
-			nodesLinkTypesCounters[targetNodeID] = make(map[LinkType]int)
-		}
-		if _, ok := nodesLinkTypesCounters[targetNodeID][link.linkType]; !ok {
-			nodesLinkTypesCounters[targetNodeID][link.linkType] = 1
-		} else {
-			nodesLinkTypesCounters[targetNodeID][link.linkType]++
-		}
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	writer.Comma = ';'
+
+	err = writer.Write([]string{"id", "node_id", "osm_node_id", "name", "in_link_id", "in_lane_start", "in_lane_end", "out_link_id", "out_lane_start", "out_lane_end", "lanes_num", "from_osm_node_id", "to_osm_node_id", "type", "penalty", "capacity", "control_type", "movement_composite_type", "volume", "free_speed", "allowed_agent_types", "geom"})
+	if err != nil {
+		return errors.Wrap(err, "Can't write header")
 	}
 
-	for nodeID, node := range net.nodes {
-		if node.poiID > -1 {
-			node.activityType = ACTIVITY_POI
-			node.activityLinkType = LINK_UNDEFINED
+	for _, mvmt := range net.movement {
+		allowedAgentTypes := make([]string, len(mvmt.allowedAgentTypes))
+		for i, agentType := range mvmt.allowedAgentTypes {
+			allowedAgentTypes[i] = fmt.Sprintf("%s", agentType)
 		}
-		if linkTypesCounters, ok := nodesLinkTypesCounters[nodeID]; ok {
-			maxLinkType := LINK_UNDEFINED
-			maxLinkTypeCount := 0
-			for linkType, counter := range linkTypesCounters {
-				if counter > maxLinkTypeCount {
-					maxLinkTypeCount = counter
-					maxLinkType = linkType
-				}
-			}
-			if maxLinkType > 0 {
-				node.activityType = ACTIVITY_LINK
-				node.activityLinkType = maxLinkType
-			} else {
-				node.activityType = ACTIVITY_NONE
-				node.activityLinkType = LINK_UNDEFINED
-			}
-		}
-	}
-
-	for _, node := range net.nodes {
-		node.boundaryType = BOUNDARY_NONE
-		if node.activityType == ACTIVITY_POI {
-			continue
-		}
-		if len(node.outcomingLinks) == 0 {
-			node.boundaryType = BOUNDARY_INCOME_ONLY
-		} else if len(node.incomingLinks) == 0 {
-			node.boundaryType = BOUNDARY_OUTCOME_ONLY
-		} else if len(node.incomingLinks) == 1 && (len(node.outcomingLinks) == 1) {
-			incomingLink, ok := net.links[node.incomingLinks[0]]
-			if !ok {
-				return fmt.Errorf("No incoming link with ID '%d'. Node ID: '%d'", node.incomingLinks[0], node.ID)
-			}
-			outcomingLink, ok := net.links[node.outcomingLinks[0]]
-			if !ok {
-				return fmt.Errorf("No incoming link with ID '%d'. Node ID: '%d'", node.outcomingLinks[0], node.ID)
-			}
-			if incomingLink.sourceNodeID == outcomingLink.targetNodeID {
-				node.boundaryType = BOUNDARY_INCOME_OUTCOME
-			}
-		}
-	}
-	for _, node := range net.nodes {
-		if node.boundaryType == BOUNDARY_NONE {
-			continue
-		}
-		node.zoneID = node.ID
-	}
-	return nil
-}
-
-func (net *NetworkMacroscopic) genMovement() error {
-	mvmtID := MovementID(0)
-	for _, node := range net.nodes {
-		mvmtList := node.genMovement(&mvmtID, net.links)
-		for _, mvmt := range mvmtList {
-			net.movement[mvmtID] = &mvmt
+		err = writer.Write([]string{
+			fmt.Sprintf("%d", mvmt.ID),
+			fmt.Sprintf("%d", mvmt.NodeID),
+			fmt.Sprintf("%d", mvmt.osmNodeID),
+			fmt.Sprintf("%s", "-"),
+			fmt.Sprintf("%d", mvmt.IncomingLinkID),
+			fmt.Sprintf("%d", mvmt.incomeLaneStart),
+			fmt.Sprintf("%d", mvmt.incomeLaneEnd),
+			fmt.Sprintf("%d", mvmt.OutcomingLinkID),
+			fmt.Sprintf("%d", mvmt.outcomeLaneStart),
+			fmt.Sprintf("%d", mvmt.outcomeLaneEnd),
+			fmt.Sprintf("%d", mvmt.lanesNum),
+			fmt.Sprintf("%d", mvmt.fromOsmNodeID),
+			fmt.Sprintf("%d", mvmt.toOsmNodeID),
+			fmt.Sprintf("%s", mvmt.movementType),
+			fmt.Sprintf("%d", -1),
+			fmt.Sprintf("%d", -1),
+			fmt.Sprintf("%s", mvmt.controlType),
+			fmt.Sprintf("%s", mvmt.movementCompositeType),
+			fmt.Sprintf("%d", -1),
+			fmt.Sprintf("%d", -1),
+			strings.Join(allowedAgentTypes, ","),
+			fmt.Sprintf("%s", wkt.MarshalString(mvmt.geom)),
+		})
+		if err != nil {
+			return errors.Wrap(err, "Can't write movement")
 		}
 	}
 	return nil

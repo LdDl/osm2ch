@@ -29,7 +29,11 @@ type NetworkLink struct {
 	allowedAgentTypes  []AgentType
 	sourceNodeID       NetworkNodeID
 	targetNodeID       NetworkNodeID
-	wasBidirectional   bool
+
+	sourceOsmNodeID osm.NodeID
+	targetOsmNodeID osm.NodeID
+
+	wasBidirectional bool
 }
 
 type DirectionType uint16
@@ -39,7 +43,7 @@ const (
 	DIRECTION_BACKWARD
 )
 
-func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNodeID, direction DirectionType, wayOSM *WayData, segmentNodes []*Node) *NetworkLink {
+func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNodeID, sourceOsmNodeID, targetOsmNodeID osm.NodeID, direction DirectionType, wayOSM *WayData, segmentNodes []*Node) *NetworkLink {
 	freeSpeed := -1.0
 	maxSpeed := -1.0
 	capacity := -1
@@ -73,6 +77,8 @@ func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNode
 		linkConnectionType: wayOSM.linkConnectionType,
 		sourceNodeID:       sourceNodeID,
 		targetNodeID:       targetNodeID,
+		sourceOsmNodeID:    sourceOsmNodeID,
+		targetOsmNodeID:    targetOsmNodeID,
 		controlType:        NOT_SIGNAL,
 		allowedAgentTypes:  make([]AgentType, len(wayOSM.allowedAgentTypes)),
 	}

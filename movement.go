@@ -5,6 +5,7 @@ import (
 
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geo"
+	"github.com/paulmach/osm"
 )
 
 type MovementID int
@@ -17,6 +18,9 @@ type Movement struct {
 
 	ID              MovementID
 	NodeID          NetworkNodeID
+	osmNodeID       osm.NodeID
+	fromOsmNodeID   osm.NodeID
+	toOsmNodeID     osm.NodeID
 	IncomingLinkID  NetworkLinkID
 	OutcomingLinkID NetworkLinkID
 
@@ -164,4 +168,15 @@ var (
 
 func (iotaIdx MovementCompositeType) String() string {
 	return [...]string{"undefined", "SBT", "SBR", "SBL", "SBU", "EBT", "EBR", "EBL", "EBU", "NBT", "NBR", "NBL", "NBU", "WBT", "WBR", "WBL", "WBU"}[iotaIdx]
+}
+
+func (net *NetworkMacroscopic) genMovement() error {
+	mvmtID := MovementID(0)
+	for _, node := range net.nodes {
+		mvmtList := node.genMovement(&mvmtID, net.links)
+		for _, mvmt := range mvmtList {
+			net.movement[mvmt.ID] = mvmt
+		}
+	}
+	return nil
 }
