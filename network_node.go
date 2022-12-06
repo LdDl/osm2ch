@@ -57,13 +57,14 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 		return false
 	}
 	if outcome == 1 {
-		incomingLinksList := []NetworkLinkID{}
+		incomingLinksList := []*NetworkLink{}
 		outcomingLinkID := node.outcomingLinks[0]
-		if outcomingLink, ok := links[outcomingLinkID]; ok {
+		outcomingLink, ok := links[outcomingLinkID]
+		if ok {
 			for _, incomingLinkID := range node.incomingLinks {
 				if incomingLink, ok := links[incomingLinkID]; ok {
 					if incomingLink.sourceNodeID != outcomingLink.targetNodeID { // Ignore all reverse directions
-						incomingLinksList = append(incomingLinksList, incomingLinkID)
+						incomingLinksList = append(incomingLinksList, incomingLink)
 					}
 				} else {
 					return false
@@ -73,7 +74,33 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 		if len(incomingLinksList) == 0 {
 			return false
 		}
-		// @todo: handle
+
+		connections := getSpansConnections(outcomingLink, incomingLinksList)
+		for i, incomingLink := range incomingLinksList {
+			incomeLaneStart := connections[i][0].first + 1
+			incomeLaneEnd := connections[i][0].second + 1
+			outcomeLaneStart := connections[i][1].first + 1
+			outcomeLaneEnd := connections[i][1].second + 1
+			lanesNum := incomeLaneEnd - incomeLaneStart + 1
+			allowedAgentTypes := make([]AgentType, len(incomingLink.allowedAgentTypes))
+			copy(allowedAgentTypes, incomingLink.allowedAgentTypes)
+			mvmt := Movement{
+				ID:                *movementID,
+				NodeID:            node.ID,
+				IncomingLinkID:    incomingLink.ID,
+				OutcomingLinkID:   outcomingLink.ID,
+				incomeLaneStart:   incomeLaneStart,
+				incomeLaneEnd:     incomeLaneEnd,
+				outcomeLaneStart:  outcomeLaneStart,
+				outcomeLaneEnd:    outcomeLaneEnd,
+				lanesNum:          lanesNum,
+				controlType:       node.controlType,
+				allowedAgentTypes: allowedAgentTypes,
+			}
+			mvmt.movementCompositeType, mvmt.movementType = movementBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
+			mvmt.geom = movementGeomBetweenLines(incomingLink.geom, outcomingLink.geom)
+			*movementID++
+		}
 	} else {
 		for _, incomingLinkID := range node.incomingLinks {
 			if incomingLink, ok := links[incomingLinkID]; ok {
