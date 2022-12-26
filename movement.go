@@ -1,7 +1,9 @@
 package osm2ch
 
 import (
+	"fmt"
 	"math"
+	"time"
 
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geo"
@@ -170,13 +172,20 @@ func (iotaIdx MovementCompositeType) String() string {
 	return [...]string{"undefined", "SBT", "SBR", "SBL", "SBU", "EBT", "EBR", "EBL", "EBU", "NBT", "NBR", "NBL", "NBU", "WBT", "WBR", "WBL", "WBU"}[iotaIdx]
 }
 
-func (net *NetworkMacroscopic) genMovement() error {
+func (net *NetworkMacroscopic) genMovement(verbose bool) error {
+	if verbose {
+		fmt.Print("Preparing movements...")
+	}
+	st := time.Now()
 	mvmtID := MovementID(0)
 	for _, node := range net.nodes {
 		mvmtList := node.genMovement(&mvmtID, net.links)
 		for _, mvmt := range mvmtList {
 			net.movement[mvmt.ID] = mvmt
 		}
+	}
+	if verbose {
+		fmt.Printf("Done in %v\n\tMovements: %d\n", time.Since(st), len(net.movement))
 	}
 	return nil
 }

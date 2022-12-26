@@ -19,6 +19,7 @@ func TestParser(t *testing.T) {
 		return
 	}
 	netMacro.genActivityType()
-	netMacro.genMovement()
+	netMacro.genMovement(verbose)
+	netMacro.genMesoscopicNetwork(verbose)
 	netMacro.ExportToCSV("network")
 }

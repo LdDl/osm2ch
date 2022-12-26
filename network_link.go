@@ -34,6 +34,10 @@ type NetworkLink struct {
 	targetOsmNodeID osm.NodeID
 
 	wasBidirectional bool
+
+	/* Mesoscopic */
+	breakpoints []float64
+	lanesChange [][]int
 }
 
 type DirectionType uint16
