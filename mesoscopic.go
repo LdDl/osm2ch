@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
+	"github.com/paulmach/orb"
 )
 
 type NetworkMesoscopic struct {
@@ -51,7 +53,35 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	/* */
 
 	/* Offset geometies */
-	// @todo
+	observed := make(map[NetworkLinkID]bool)
+	links := linksToSlice(net.links)
+	for i, linkID := range links {
+		link, ok := net.links[linkID]
+		if !ok {
+			return nil, fmt.Errorf("Link %d not found. Should not happen", linkID)
+		}
+		if _, ok := observed[linkID]; ok {
+			continue
+		}
+		reversedGeom := link.geomEuclidean.Clone()
+		reversedGeom.Reverse()
+		reversedLinkExists := false
+		for _, linkCompareID := range links[i+1:] {
+			linkCompare, ok := net.links[linkCompareID]
+			if !ok {
+				return nil, fmt.Errorf("Link %d not found. Should not happen", linkID)
+			}
+			if orb.Equal(reversedGeom, linkCompare.geomEuclidean) {
+				reversedLinkExists = true
+				observed[linkID] = true
+				observed[linkCompareID] = true
+				break
+			}
+		}
+		if !reversedLinkExists {
+			observed[linkID] = false
+		}
+	}
 	/* */
 
 	/* Process movements */
@@ -74,4 +104,12 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		fmt.Printf("Done in %v\n", time.Since(st))
 	}
 	return &mesoscopic, nil
+}
+
+func linksToSlice(links map[NetworkLinkID]*NetworkLink) []NetworkLinkID {
+	ans := make([]NetworkLinkID, 0, len(links))
+	for k := range links {
+		ans = append(ans, k)
+	}
+	return ans
 }
