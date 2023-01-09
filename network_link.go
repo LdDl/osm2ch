@@ -36,8 +36,10 @@ type NetworkLink struct {
 	wasBidirectional bool
 
 	/* Mesoscopic */
-	breakpoints []float64
-	lanesChange [][]int
+	breakpoints         []float64
+	lanesChange         [][]int
+	geomOffset          orb.LineString
+	geomEuclideanOffset orb.LineString
 }
 
 type DirectionType uint16
@@ -150,4 +152,17 @@ func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNode
 
 func (link *NetworkLink) GetLanes() int {
 	return link.lanesList[0]
+}
+
+func (link *NetworkLink) MaxLanes() int {
+	if len(link.lanesList) == 0 {
+		return -1
+	}
+	max := link.lanesList[0]
+	for _, lane := range link.lanesList {
+		if lane > max {
+			max = lane
+		}
+	}
+	return max
 }

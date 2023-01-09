@@ -36,6 +36,19 @@ func lineToEuclidean(line orb.LineString) orb.LineString {
 	return newLine
 }
 
+func pointToSpherical(pt orb.Point) orb.Point {
+	sphericalX, sphericalY := epsg3857To4326(pt.X(), pt.Y())
+	return orb.Point{sphericalX, sphericalY}
+}
+
+func lineToSpherical(line orb.LineString) orb.LineString {
+	newLine := make(orb.LineString, len(line))
+	for i, pt := range line {
+		newLine[i] = pointToSpherical(pt)
+	}
+	return newLine
+}
+
 // angleBetweenLines returs angle between two lines
 //
 // Note: panics if number of points in any line is less than 2

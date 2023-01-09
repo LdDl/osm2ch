@@ -13,6 +13,7 @@ type NetworkMesoscopic struct {
 
 const (
 	resolution = 5.0
+	laneWidth  = 3.5
 )
 
 func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesoscopic, error) {
@@ -58,7 +59,7 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	for i, linkID := range links {
 		link, ok := net.links[linkID]
 		if !ok {
-			return nil, fmt.Errorf("Link %d not found. Should not happen", linkID)
+			return nil, fmt.Errorf("Link %d not found. Should not happen [Loop over all links]", linkID)
 		}
 		if _, ok := observed[linkID]; ok {
 			continue
@@ -69,7 +70,7 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		for _, linkCompareID := range links[i+1:] {
 			linkCompare, ok := net.links[linkCompareID]
 			if !ok {
-				return nil, fmt.Errorf("Link %d not found. Should not happen", linkID)
+				return nil, fmt.Errorf("Link %d not found. Should not happen [Loop over remaining links]", linkID)
 			}
 			if orb.Equal(reversedGeom, linkCompare.geomEuclidean) {
 				reversedLinkExists = true
@@ -81,6 +82,22 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		if !reversedLinkExists {
 			observed[linkID] = false
 		}
+	}
+	for linkID, needOffset := range observed {
+		link, ok := net.links[linkID]
+		if !ok {
+			return nil, fmt.Errorf("Link %d not found. Should not happen [Loop over observed links]", linkID)
+		}
+		if needOffset {
+			offsetDistance := 2 * (float64(link.MaxLanes())/2 + 0.5) * laneWidth
+			geomEuclidean := link.geomEuclidean.Clone()
+			offsetGeom := offsetCurve(geomEuclidean, offsetDistance) // Use "-" sign to make offset to the right side
+			link.geomEuclideanOffset = offsetGeom.Clone()
+			link.geomOffset = lineToSpherical(link.geomEuclideanOffset)
+			continue
+		}
+		link.geomOffset = link.geom.Clone()
+		link.geomEuclideanOffset = link.geomEuclidean.Clone()
 	}
 	/* */
 
