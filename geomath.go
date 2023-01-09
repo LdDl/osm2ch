@@ -128,11 +128,11 @@ func findDistance(p, q GeoPoint) float64 {
 	return math.Sqrt(xdistance*xdistance + ydistance*ydistance)
 }
 
-// Check if two segments intersects and returns intersections Point
+// Checks if two segments intersects and returns intersections Point
 // p1, p2 - first segment
 // p3, p4 - second segment
 // Note: Euclidean space
-func intersect(p1, p2, p3, p4 orb.Point) (orb.Point, error) {
+func intersection(p1, p2, p3, p4 orb.Point) (orb.Point, error) {
 	// Calculate the coefficients of the linear equations
 	a1 := p2[1] - p1[1]
 	b1 := p1[0] - p2[0]
@@ -192,7 +192,7 @@ func offsetCurve(line orb.LineString, distance float64) orb.LineString {
 		seg1 := segments[i-1]
 		seg2 := segments[i]
 		// Calculate the intersection point
-		intersection, err := intersect(seg1[0], seg1[1], seg2[0], seg2[1])
+		intersection, err := intersection(seg1[0], seg1[1], seg2[0], seg2[1])
 		if err != nil {
 			continue
 		}
