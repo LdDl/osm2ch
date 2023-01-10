@@ -25,6 +25,10 @@ type NetworkNode struct {
 	activityLinkType LinkType
 	geom             orb.Point
 	geomEuclidean    orb.Point
+
+	/* Mesoscopic */
+	movements        []*Movement
+	movementIsNeeded bool
 }
 
 func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
@@ -161,5 +165,7 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 			}
 		}
 	}
+	node.movements = make([]*Movement, 0, len(response))
+	node.movements = append(node.movements, response...)
 	return response
 }

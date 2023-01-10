@@ -102,7 +102,73 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	/* */
 
 	/* Process movements */
-	// @todo
+	for _, node := range net.nodes {
+		if node.controlType == IS_SIGNAL {
+			continue
+		}
+		if len(node.incomingLinks) == 1 && len(node.outcomingLinks) >= 1 {
+			// Only one incoming link
+			observed := make(map[NetworkLinkID]struct{})
+			multipleConnections := false
+			for _, movement := range node.movements {
+				if _, ok := observed[movement.OutcomingLinkID]; ok {
+					multipleConnections = true
+					break
+				} else {
+					observed[movement.OutcomingLinkID] = struct{}{}
+				}
+			}
+			if multipleConnections {
+				continue
+			}
+			node.movementIsNeeded = false
+			linkID := node.incomingLinks[0]
+			if link, ok := net.links[linkID]; ok {
+				link.downstreamShortCut = true
+				link.downstreamIsTarget = true
+				for _, outcomingLinkID := range node.outcomingLinks {
+					if outcomingLink, ok := net.links[outcomingLinkID]; ok {
+						outcomingLink.upstreamShortCut = true
+					} else {
+						return nil, fmt.Errorf("nested outcoming link %d not found. Should not happen [Process movements]", linkID)
+					}
+				}
+			} else {
+				return nil, fmt.Errorf("incoming link %d not found. Should not happen [Process movements]", linkID)
+			}
+		} else if len(node.outcomingLinks) == 1 && len(node.incomingLinks) >= 1 {
+			// Only one outcoming link
+			observed := make(map[NetworkLinkID]struct{})
+			multipleConnections := false
+			for _, movement := range node.movements {
+				if _, ok := observed[movement.IncomingLinkID]; ok {
+					multipleConnections = true
+					break
+				} else {
+					observed[movement.IncomingLinkID] = struct{}{}
+				}
+			}
+			if multipleConnections {
+				continue
+			}
+			node.movementIsNeeded = false
+			linkID := node.outcomingLinks[0]
+			if link, ok := net.links[linkID]; ok {
+				link.upstreamShortCut = true
+				link.upstreamIsTarget = true
+				for _, incomingLinkID := range node.incomingLinks {
+					if incomingLink, ok := net.links[incomingLinkID]; ok {
+						incomingLink.downstreamShortCut = true
+					} else {
+						return nil, fmt.Errorf("nested incoming link %d not found. Should not happen [Process movements]", linkID)
+					}
+				}
+			} else {
+				return nil, fmt.Errorf("outcoming link %d not found. Should not happen [Process movements]", linkID)
+			}
+		}
+	}
+
 	/* */
 
 	/* Process macro links */
