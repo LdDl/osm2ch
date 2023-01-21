@@ -40,10 +40,16 @@ type NetworkLink struct {
 	lanesChange         [][]int
 	geomOffset          orb.LineString
 	geomEuclideanOffset orb.LineString
-	downstreamShortCut  bool
-	upstreamShortCut    bool
-	downstreamIsTarget  bool
-	upstreamIsTarget    bool
+	lengthMetersOffset  float64
+
+	downstreamShortCut bool
+	upstreamShortCut   bool
+
+	downstreamIsTarget bool
+	upstreamIsTarget   bool
+
+	upstreamCutLen   float64
+	downstreamCutLen float64
 }
 
 type DirectionType uint16

@@ -2,18 +2,26 @@ package osm2ch
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/geo"
 )
 
 type NetworkMesoscopic struct {
 }
 
 const (
-	resolution = 5.0
-	laneWidth  = 3.5
+	resolution  = 5.0
+	laneWidth   = 3.5
+	shortcutLen = 0.1
+	cutLenMin   = 2.0
+)
+
+var (
+	cutLen = [100]float64{2.0, 8.0, 12.0, 14.0, 16.0, 18.0, 20, 22, 24, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25}
 )
 
 func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesoscopic, error) {
@@ -99,6 +107,15 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		link.geomOffset = link.geom.Clone()
 		link.geomEuclideanOffset = link.geomEuclidean.Clone()
 	}
+
+	// Update breakpoints since geometry has changed
+	for _, link := range net.links {
+		// Re-calcuate length for offset geometry and round to 2 decimal places
+		link.lengthMetersOffset = math.Round(geo.LengthHaversign(link.geomOffset)*100.0) / 100.0
+		for i, item := range link.breakpoints {
+			link.breakpoints[i] = (item / link.lengthMeters) * link.lengthMetersOffset
+		}
+	}
 	/* */
 
 	/* Process movements */
@@ -172,6 +189,10 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	/* */
 
 	/* Process macro links */
+	for linkID, link := range net.links {
+		_ = linkID
+		link.calcCutLen()
+	}
 	// @todo
 	/* */
 
@@ -187,6 +208,80 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		fmt.Printf("Done in %v\n", time.Since(st))
 	}
 	return &mesoscopic, nil
+}
+
+func (link *NetworkLink) calcCutLen() {
+	//  Defife a variable downstream_max_cut which is the maximum length of a cut that can be made downstream of the link,
+	// calculated as the maximum of the _length_of_short_cut and the difference between the last two elements in the link.lanes_change_point_list minus 3.
+	downStreamMaxCut := math.Max(shortcutLen, link.breakpoints[len(link.breakpoints)-1]-link.breakpoints[len(link.breakpoints)-2]-3)
+	_ = downStreamMaxCut
+	if link.upstreamShortCut && link.downstreamShortCut {
+		totalLengthCut := 2 * shortcutLen * cutLenMin
+		_ = totalLengthCut
+		if link.lengthMetersOffset > totalLengthCut {
+			link.upstreamCutLen = shortcutLen
+			link.downstreamCutLen = shortcutLen
+		} else {
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLengthCut) * shortcutLen
+			link.downstreamCutLen = link.upstreamCutLen
+		}
+	} else if link.upstreamShortCut {
+		cutIdx := 0
+		cutPlaceFound := false
+		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
+			if link.lengthMetersOffset > math.Min(downStreamMaxCut, cutLen[i])+shortcutLen+cutLenMin {
+				cutIdx = i
+				cutPlaceFound = true
+				break
+			}
+		}
+		if cutPlaceFound {
+			link.upstreamCutLen = shortcutLen
+			link.downstreamCutLen = math.Min(downStreamMaxCut, cutLen[cutIdx])
+		} else {
+			downStreamCut := math.Min(downStreamMaxCut, cutLen[0])
+			totalLen := downStreamCut + shortcutLen + cutLenMin
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * shortcutLen
+			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
+		}
+	} else if link.downstreamShortCut {
+		cutIdx := 0
+		cutPlaceFound := false
+		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
+			if link.lengthMetersOffset > cutLen[i]+shortcutLen+cutLenMin {
+				cutIdx = i
+				cutPlaceFound = true
+				break
+			}
+		}
+		if cutPlaceFound {
+			link.upstreamCutLen = cutLen[cutIdx]
+			link.downstreamCutLen = shortcutLen
+		} else {
+			totalLen := cutLen[0] + shortcutLen + cutLenMin
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
+			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * shortcutLen
+		}
+	} else {
+		cutIdx := 0
+		cutPlaceFound := false
+		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
+			if link.lengthMetersOffset > cutLen[i]+math.Min(downStreamMaxCut, cutLen[i])+cutLenMin {
+				cutIdx = i
+				cutPlaceFound = true
+				break
+			}
+		}
+		if cutPlaceFound {
+			link.upstreamCutLen = cutLen[cutIdx]
+			link.downstreamCutLen = math.Min(downStreamMaxCut, cutLen[cutIdx])
+		} else {
+			downStreamCut := math.Min(downStreamMaxCut, cutLen[0])
+			totalLen := downStreamCut + cutLen[0] + cutLenMin
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
+			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
+		}
+	}
 }
 
 func linksToSlice(links map[NetworkLinkID]*NetworkLink) []NetworkLinkID {
