@@ -99,7 +99,7 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		if needOffset {
 			offsetDistance := 2 * (float64(link.MaxLanes())/2 + 0.5) * laneWidth
 			geomEuclidean := link.geomEuclidean.Clone()
-			offsetGeom := offsetCurve(geomEuclidean, offsetDistance) // Use "-" sign to make offset to the right side
+			offsetGeom := offsetCurve(geomEuclidean, -offsetDistance) // Use "-" sign to make offset to the right side
 			link.geomEuclideanOffset = offsetGeom.Clone()
 			link.geomOffset = lineToSpherical(link.geomEuclideanOffset)
 			continue
@@ -191,7 +191,11 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	/* Process macro links */
 	for linkID, link := range net.links {
 		_ = linkID
+		// fmt.Println("cut", linkID)
+		// Prepare cut length for each link
 		link.calcCutLen()
+		// Perform the cut
+		link.performCut()
 	}
 	// @todo
 	/* */
@@ -210,11 +214,11 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	return &mesoscopic, nil
 }
 
+// Prepares cut length for link
 func (link *NetworkLink) calcCutLen() {
-	//  Defife a variable downstream_max_cut which is the maximum length of a cut that can be made downstream of the link,
+	// Defife a variable downstream_max_cut which is the maximum length of a cut that can be made downstream of the link,
 	// calculated as the maximum of the _length_of_short_cut and the difference between the last two elements in the link.lanes_change_point_list minus 3.
 	downStreamMaxCut := math.Max(shortcutLen, link.breakpoints[len(link.breakpoints)-1]-link.breakpoints[len(link.breakpoints)-2]-3)
-	_ = downStreamMaxCut
 	if link.upstreamShortCut && link.downstreamShortCut {
 		totalLengthCut := 2 * shortcutLen * cutLenMin
 		_ = totalLengthCut
@@ -281,6 +285,50 @@ func (link *NetworkLink) calcCutLen() {
 			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
 			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
 		}
+	}
+}
+
+// Cuts redudant geometry
+func (link *NetworkLink) performCut() {
+
+	// Create copy for those since we will do mutations and want to keep original data
+	breakpoints := make([]float64, len(link.breakpoints))
+	copy(breakpoints, link.breakpoints)
+	link.lanesListCut = make([]int, len(link.lanesList))
+	copy(link.lanesListCut, link.lanesList)
+	link.lanesChangeCut = make([][]int, len(link.lanesChange))
+	copy(link.lanesChange, link.lanesChange)
+
+	breakIdx := 1
+	for breakIdx = 1; breakIdx < len(breakpoints); breakIdx++ {
+		if breakpoints[breakIdx] > link.upstreamCutLen {
+			break
+		}
+	}
+	breakpoints = append(breakpoints[breakIdx:])
+	breakpoints = append([]float64{link.upstreamCutLen}, breakpoints...)
+	link.lanesListCut = link.lanesListCut[breakIdx-1:]
+	link.lanesChange = link.lanesChange[breakIdx-1:]
+
+	breakIdx = len(breakpoints) - 2
+	for breakIdx := len(breakpoints) - 2; breakIdx >= 0; breakIdx-- {
+		if link.lengthMetersOffset-breakpoints[breakIdx] > link.downstreamCutLen {
+			break
+		}
+	}
+	breakpoints = breakpoints[:breakIdx+1]
+	breakpoints = append(breakpoints, link.lengthMetersOffset-link.downstreamCutLen)
+	link.lanesListCut = link.lanesListCut[:breakIdx+1]
+	link.lanesChange = link.lanesChange[:breakIdx+1]
+
+	for i := range link.lanesListCut {
+		start := breakpoints[i]
+		end := breakpoints[i+1]
+		geomCut := SubstringHaversine(link.geomOffset, start, end)
+		geomEuclideanCut := lineToSpherical(geomCut)
+		link.geomOffsetCut = append(link.geomOffsetCut, geomCut)
+		link.geomEuclideanOffsetCut = append(link.geomEuclideanOffsetCut, geomEuclideanCut)
+		// fmt.Printf("%d;%d;%s\n", link.ID, link.lanesListCut[i], wkt.MarshalString(geomCut))
 	}
 }
 

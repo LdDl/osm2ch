@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/encoding/wkt"
 )
 
 func TestMiddlePoint(t *testing.T) {
@@ -194,4 +195,19 @@ const (
 
 func deg2rad(deg float64) float64 {
 	return deg * d2r
+}
+
+func TestLineSubstring(t *testing.T) {
+	lineWKT := "LINESTRING (37.56319128200903 55.78357465483572, 37.565235359279626 55.78497472894253, 37.565822487858156 55.785421030200496, 37.567355545810614 55.784711836767826)"
+	line, err := wkt.UnmarshalLineString(lineWKT)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	newline := SubstringHaversine(line, 215, 278)
+	newLineWKT := wkt.MarshalString(newline)
+	correctLine := "LINESTRING(37.56536219999623 55.78507114703719,37.565822487858156 55.785421030200496,37.56600203415945 55.785337974305975)"
+	if correctLine != newLineWKT {
+		t.Errorf("Correct line should be '%s', but got '%s'", correctLine, newLineWKT)
+	}
 }

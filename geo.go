@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/geo"
 )
 
 const (
@@ -64,4 +65,64 @@ func angleBetweenLines(l1 orb.LineString, l2 orb.LineString) float64 {
 		angle -= 2 * math.Pi
 	}
 	return angle
+}
+
+// Returns a line segment between specified distances along the given line
+// using DistanceHaversine for more accurate results
+// @TODO: Handle edge-cases such as:
+// 1. negative values for distances
+// 2. startDist > endDist
+// 3. startDist > totalLengthMeters
+// 4. endDist > totalLengthMeters
+func SubstringHaversine(line orb.LineString, startDist float64, endDist float64) orb.LineString {
+	var substring orb.LineString
+	totalLengthMeters := 0.0
+	for i := 1; i < len(line); i++ {
+		segmentStart := line[i-1]
+		segmentEnd := line[i]
+		segmentLengthMeters := geo.DistanceHaversine(segmentStart, segmentEnd)
+		totalLengthMeters += segmentLengthMeters
+		if totalLengthMeters >= startDist {
+			substring = append(substring, segmentStart)
+			if totalLengthMeters >= endDist {
+				substring = append(substring, segmentEnd)
+				break
+			}
+		}
+	}
+	startCut, _ := geo.PointAtDistanceAlongLine(line, startDist)
+	endCut, _ := geo.PointAtDistanceAlongLine(line, endDist)
+	substring[0] = startCut
+	substring[len(substring)-1] = endCut
+	return substring
+}
+
+// Returns a line segment between specified distances along the given line
+// using simple Euclidean distance function
+// @TODO: Handle edge-cases such as:
+// 1. negative values for distances
+// 2. startDist > endDist
+// 3. startDist > totalLengthMeters
+// 4. endDist > totalLengthMeters
+func Substring(line orb.LineString, startDist float64, endDist float64) orb.LineString {
+	var substring orb.LineString
+	totalLengthMeters := 0.0
+	for i := 1; i < len(line); i++ {
+		segmentStart := line[i-1]
+		segmentEnd := line[i]
+		segmentLengthMeters := geo.Distance(segmentStart, segmentEnd)
+		totalLengthMeters += segmentLengthMeters
+		if totalLengthMeters >= startDist {
+			substring = append(substring, segmentStart)
+			if totalLengthMeters >= endDist {
+				substring = append(substring, segmentEnd)
+				break
+			}
+		}
+	}
+	startCut, _ := geo.PointAtDistanceAlongLine(line, startDist)
+	endCut, _ := geo.PointAtDistanceAlongLine(line, endDist)
+	substring[0] = startCut
+	substring[len(substring)-1] = endCut
+	return substring
 }

@@ -36,11 +36,15 @@ type NetworkLink struct {
 	wasBidirectional bool
 
 	/* Mesoscopic */
-	breakpoints         []float64
-	lanesChange         [][]int
-	geomOffset          orb.LineString
-	geomEuclideanOffset orb.LineString
-	lengthMetersOffset  float64
+	breakpoints            []float64
+	lanesListCut           []int
+	lanesChange            [][]int
+	lanesChangeCut         [][]int
+	geomOffset             orb.LineString
+	geomOffsetCut          []orb.LineString
+	geomEuclideanOffset    orb.LineString
+	geomEuclideanOffsetCut []orb.LineString
+	lengthMetersOffset     float64
 
 	downstreamShortCut bool
 	upstreamShortCut   bool
