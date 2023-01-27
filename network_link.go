@@ -36,6 +36,7 @@ type NetworkLink struct {
 	wasBidirectional bool
 
 	/* Mesoscopic */
+	mesolinks              []NetworkLinkID
 	breakpoints            []float64
 	lanesListCut           []int
 	lanesChange            [][]int
@@ -264,7 +265,7 @@ func (link *NetworkLink) performCut() {
 	link.lanesListCut = make([]int, len(link.lanesList))
 	copy(link.lanesListCut, link.lanesList)
 	link.lanesChangeCut = make([][]int, len(link.lanesChange))
-	copy(link.lanesChange, link.lanesChange)
+	copy(link.lanesChangeCut, link.lanesChange)
 
 	breakIdx := 1
 	for breakIdx = 1; breakIdx < len(breakpoints); breakIdx++ {

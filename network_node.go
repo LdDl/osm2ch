@@ -36,19 +36,20 @@ type NetworkNode struct {
 
 func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
 	node := NetworkNode{
-		incomingLinks:  make([]NetworkLinkID, 0),
-		outcomingLinks: make([]NetworkLinkID, 0),
-		activityType:   ACTIVITY_NONE,
-		name:           nodeOSM.name,
-		osmHighway:     nodeOSM.highway,
-		ID:             id,
-		osmNodeID:      nodeOSM.ID,
-		intersectionID: -1,
-		zoneID:         -1,
-		poiID:          -1,
-		controlType:    nodeOSM.controlType,
-		boundaryType:   BOUNDARY_NONE,
-		geom:           nodeOSM.node.Point(),
+		incomingLinks:    make([]NetworkLinkID, 0),
+		outcomingLinks:   make([]NetworkLinkID, 0),
+		activityType:     ACTIVITY_NONE,
+		name:             nodeOSM.name,
+		osmHighway:       nodeOSM.highway,
+		ID:               id,
+		osmNodeID:        nodeOSM.ID,
+		intersectionID:   -1,
+		zoneID:           -1,
+		poiID:            -1,
+		controlType:      nodeOSM.controlType,
+		boundaryType:     BOUNDARY_NONE,
+		geom:             nodeOSM.node.Point(),
+		movementIsNeeded: true, // Consider all nodes as intersections by default
 	}
 	return &node
 }

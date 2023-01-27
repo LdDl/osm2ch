@@ -37,7 +37,6 @@ func (net *NetworkMacroscopic) ExportToCSV(fname string) error {
 	if err != nil {
 		return errors.Wrap(err, "Can't export movement")
 	}
-
 	return nil
 }
 
