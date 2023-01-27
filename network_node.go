@@ -29,6 +29,9 @@ type NetworkNode struct {
 	/* Mesoscopic */
 	movements        []*Movement
 	movementIsNeeded bool
+
+	/* Not used */
+	isCentroid bool
 }
 
 func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
@@ -168,4 +171,16 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 	node.movements = make([]*Movement, 0, len(response))
 	node.movements = append(node.movements, response...)
 	return response
+}
+
+type NetworkNodeMesoscopic struct {
+	incomingLinks  []NetworkLinkID
+	outcomingLinks []NetworkLinkID
+
+	geom          orb.Point
+	geomEuclidean orb.Point
+
+	ID          NetworkNodeID
+	macroNodeID NetworkNodeID
+	macroLinkID NetworkLinkID
 }

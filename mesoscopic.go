@@ -11,6 +11,13 @@ import (
 )
 
 type NetworkMesoscopic struct {
+	nodes map[NetworkNodeID]*NetworkNodeMesoscopic
+	links map[NetworkLinkID]NetworkLinkMesoscopic
+	// Storage to track number of generated mesoscopic nodes for each macroscopic node which is centroid
+	// Key: NodeID, Value: Number of expanded nodes
+	expandedMesoNodes map[NetworkNodeID]int
+	// Track ID generator
+	maxLinkID NetworkLinkID
 }
 
 const (
@@ -18,6 +25,7 @@ const (
 	laneWidth   = 3.5
 	shortcutLen = 0.1
 	cutLenMin   = 2.0
+	cellLength  = 4.5
 )
 
 var (
@@ -29,7 +37,11 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		fmt.Print("Preparing mesocopic...")
 	}
 	st := time.Now()
-	mesoscopic := NetworkMesoscopic{}
+	mesoscopic := NetworkMesoscopic{
+		nodes:             make(map[NetworkNodeID]*NetworkNodeMesoscopic),
+		links:             make(map[NetworkLinkID]NetworkLinkMesoscopic),
+		expandedMesoNodes: make(map[NetworkNodeID]int),
+	}
 
 	/* Prepare segments */
 	for _, link := range net.links {
@@ -197,15 +209,15 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		// Perform the cut
 		link.performCut()
 	}
-	// @todo
 	/* */
 
 	/* Gen movement (if needed) */
-	// @todo
+	// I has to be done before the micro/meso generation currently.
+	// @todo: Consider optional auto-generation
 	/* */
 
 	/* Build meso/micro */
-	// @todo
+	mesoscopic.generateLinks(net)
 	/* */
 
 	if verbose {
@@ -214,128 +226,118 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	return &mesoscopic, nil
 }
 
-// Prepares cut length for link
-func (link *NetworkLink) calcCutLen() {
-	// Defife a variable downstream_max_cut which is the maximum length of a cut that can be made downstream of the link,
-	// calculated as the maximum of the _length_of_short_cut and the difference between the last two elements in the link.lanes_change_point_list minus 3.
-	downStreamMaxCut := math.Max(shortcutLen, link.breakpoints[len(link.breakpoints)-1]-link.breakpoints[len(link.breakpoints)-2]-3)
-	if link.upstreamShortCut && link.downstreamShortCut {
-		totalLengthCut := 2 * shortcutLen * cutLenMin
-		_ = totalLengthCut
-		if link.lengthMetersOffset > totalLengthCut {
-			link.upstreamCutLen = shortcutLen
-			link.downstreamCutLen = shortcutLen
-		} else {
-			link.upstreamCutLen = (link.lengthMetersOffset / totalLengthCut) * shortcutLen
-			link.downstreamCutLen = link.upstreamCutLen
-		}
-	} else if link.upstreamShortCut {
-		cutIdx := 0
-		cutPlaceFound := false
-		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
-			if link.lengthMetersOffset > math.Min(downStreamMaxCut, cutLen[i])+shortcutLen+cutLenMin {
-				cutIdx = i
-				cutPlaceFound = true
-				break
+// createSubNodes creates expanded nodes for nodes in macroscopic network
+// @TODO: Consider additional field `isCentroid` for NetworkNode type.
+func (mesoNet *NetworkMesoscopic) createExpandedNodes(macroNodes map[NetworkNodeID]*NetworkNode) {
+	for _, node := range macroNodes {
+		_ = node
+		// Pseudo-code
+		/*
+			if node.isCentroid {
+				if mesoNet.expandedMesoNodes.has(node.id) {
+					mesoNet.expandedMesoNodes.set(node.id, 0)
+				}
+				expandedNodesNum := mesoNet.expandedMesoNodes.get(node.id)
+				mesoNet.expandedMesoNodes[node.id] += 1
+				mesoNode := NewMesoNode(node.id, expandedNodesNum)
+				mesoNode.geom = node.geom.copy()
+				mesoNode.geomEuclidead = node.geomEuclidead.copy()
+				mesoNode.macro_node_id = node.id
+				node.centroid_meso_node_id = mesoNode.id
+				mesoNet.nodes[mesoNode.id] = mesoNode
 			}
-		}
-		if cutPlaceFound {
-			link.upstreamCutLen = shortcutLen
-			link.downstreamCutLen = math.Min(downStreamMaxCut, cutLen[cutIdx])
-		} else {
-			downStreamCut := math.Min(downStreamMaxCut, cutLen[0])
-			totalLen := downStreamCut + shortcutLen + cutLenMin
-			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * shortcutLen
-			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
-		}
-	} else if link.downstreamShortCut {
-		cutIdx := 0
-		cutPlaceFound := false
-		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
-			if link.lengthMetersOffset > cutLen[i]+shortcutLen+cutLenMin {
-				cutIdx = i
-				cutPlaceFound = true
-				break
-			}
-		}
-		if cutPlaceFound {
-			link.upstreamCutLen = cutLen[cutIdx]
-			link.downstreamCutLen = shortcutLen
-		} else {
-			totalLen := cutLen[0] + shortcutLen + cutLenMin
-			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
-			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * shortcutLen
-		}
-	} else {
-		cutIdx := 0
-		cutPlaceFound := false
-		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
-			if link.lengthMetersOffset > cutLen[i]+math.Min(downStreamMaxCut, cutLen[i])+cutLenMin {
-				cutIdx = i
-				cutPlaceFound = true
-				break
-			}
-		}
-		if cutPlaceFound {
-			link.upstreamCutLen = cutLen[cutIdx]
-			link.downstreamCutLen = math.Min(downStreamMaxCut, cutLen[cutIdx])
-		} else {
-			downStreamCut := math.Min(downStreamMaxCut, cutLen[0])
-			totalLen := downStreamCut + cutLen[0] + cutLenMin
-			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
-			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
-		}
+		*/
 	}
 }
 
-// Cuts redudant geometry
-func (link *NetworkLink) performCut() {
+// generateLinks generates mesoscopic links from post-processed macroscopic links (with needed cuts)
+func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) error {
+	lastMesoLinkID := NetworkLinkID(0)
 
-	// Create copy for those since we will do mutations and want to keep original data
-	breakpoints := make([]float64, len(link.breakpoints))
-	copy(breakpoints, link.breakpoints)
-	link.lanesListCut = make([]int, len(link.lanesList))
-	copy(link.lanesListCut, link.lanesList)
-	link.lanesChangeCut = make([][]int, len(link.lanesChange))
-	copy(link.lanesChange, link.lanesChange)
-
-	breakIdx := 1
-	for breakIdx = 1; breakIdx < len(breakpoints); breakIdx++ {
-		if breakpoints[breakIdx] > link.upstreamCutLen {
-			break
+	for _, link := range macroNet.links {
+		// Prepare source mesoscopic node
+		var upstreamMesoNode NetworkNodeMesoscopic
+		sourceMacroNodeID := link.sourceNodeID
+		sourceMacroNode, ok := macroNet.nodes[sourceMacroNodeID]
+		if !ok {
+			return fmt.Errorf("generateLinks(): Source node %d not found", sourceMacroNodeID)
 		}
-	}
-	breakpoints = append(breakpoints[breakIdx:])
-	breakpoints = append([]float64{link.upstreamCutLen}, breakpoints...)
-	link.lanesListCut = link.lanesListCut[breakIdx-1:]
-	link.lanesChange = link.lanesChange[breakIdx-1:]
-
-	breakIdx = len(breakpoints) - 2
-	for breakIdx := len(breakpoints) - 2; breakIdx >= 0; breakIdx-- {
-		if link.lengthMetersOffset-breakpoints[breakIdx] > link.downstreamCutLen {
-			break
+		if sourceMacroNode.isCentroid {
+			// @TODO: upstream == macro.centroid ???
+		} else {
+			expNodesNum, ok := mesoNet.expandedMesoNodes[sourceMacroNodeID]
+			if !ok {
+				mesoNet.expandedMesoNodes[sourceMacroNodeID] = 0
+			}
+			mesoNet.expandedMesoNodes[sourceMacroNodeID] += 1
+			upstreamMesoNode = NetworkNodeMesoscopic{
+				ID:            sourceMacroNodeID*100 + NetworkNodeID(expNodesNum),
+				geom:          link.geomOffsetCut[0][0], // No explicit copy or clone method since Point is not slice, but array
+				geomEuclidean: link.geomEuclideanOffsetCut[0][0],
+				macroNodeID:   sourceMacroNodeID,
+				macroLinkID:   -1,
+			}
+			mesoNet.nodes[upstreamMesoNode.ID] = &upstreamMesoNode
 		}
-	}
-	breakpoints = breakpoints[:breakIdx+1]
-	breakpoints = append(breakpoints, link.lengthMetersOffset-link.downstreamCutLen)
-	link.lanesListCut = link.lanesListCut[:breakIdx+1]
-	link.lanesChange = link.lanesChange[:breakIdx+1]
 
-	for i := range link.lanesListCut {
-		start := breakpoints[i]
-		end := breakpoints[i+1]
-		geomCut := SubstringHaversine(link.geomOffset, start, end)
-		geomEuclideanCut := lineToSpherical(geomCut)
-		link.geomOffsetCut = append(link.geomOffsetCut, geomCut)
-		link.geomEuclideanOffsetCut = append(link.geomEuclideanOffsetCut, geomEuclideanCut)
-		// fmt.Printf("%d;%d;%s\n", link.ID, link.lanesListCut[i], wkt.MarshalString(geomCut))
-	}
-}
+		// Prepare link and target mesoscopic node
+		segmentsToCut := len(link.lanesListCut)
+		upstreamNodeID := upstreamMesoNode.ID
+		var downstreamMesoNode NetworkNodeMesoscopic
+		targetMacroNodeID := link.targetNodeID
+		targetMacroNode, ok := macroNet.nodes[targetMacroNodeID]
+		if !ok {
+			return fmt.Errorf("generateLinks(): Target node %d not found", sourceMacroNodeID)
+		}
+		for segmentIdx := 0; segmentIdx < segmentsToCut; segmentIdx++ {
+			// Prepare mesoscopic node
+			if targetMacroNode.isCentroid && segmentIdx == segmentsToCut-1 {
+				// @TODO: downstream == macro.centroid ???
+			} else {
+				expNodesNum, ok := mesoNet.expandedMesoNodes[targetMacroNodeID]
+				if !ok {
+					mesoNet.expandedMesoNodes[targetMacroNodeID] = 0
+				}
+				mesoNet.expandedMesoNodes[targetMacroNodeID] += 1
+				downstreamMesoNode = NetworkNodeMesoscopic{
+					ID:            targetMacroNodeID*100 + NetworkNodeID(expNodesNum),
+					geom:          link.geomOffsetCut[segmentIdx][len(link.geomOffsetCut[segmentIdx])-1], // No explicit copy or clone method since Point is not slice, but array
+					geomEuclidean: link.geomEuclideanOffsetCut[segmentIdx][len(link.geomEuclideanOffsetCut[segmentIdx])-1],
+				}
+				if segmentIdx == segmentsToCut-1 {
+					downstreamMesoNode.macroNodeID = targetMacroNodeID
+					downstreamMesoNode.macroLinkID = -1
+				} else {
+					downstreamMesoNode.macroNodeID = -1
+					downstreamMesoNode.macroLinkID = link.ID
+				}
+				mesoNet.nodes[downstreamMesoNode.ID] = &downstreamMesoNode
+			}
 
-func linksToSlice(links map[NetworkLinkID]*NetworkLink) []NetworkLinkID {
-	ans := make([]NetworkLinkID, 0, len(links))
-	for k := range links {
-		ans = append(ans, k)
+			// Prepare mesoscopic link
+
+			mesoLink := NetworkLinkMesoscopic{
+				ID:            lastMesoLinkID,
+				sourceNodeID:  upstreamNodeID,
+				targetNodeID:  downstreamMesoNode.ID,
+				lanesNum:      link.lanesListCut[segmentIdx],
+				lanesChange:   link.lanesChangeCut[segmentIdx],
+				geom:          link.geomOffsetCut[segmentIdx].Clone(),
+				geomEuclidean: link.geomEuclideanOffsetCut[segmentIdx].Clone(),
+				macroLinkID:   link.ID,
+			}
+
+			mesoNet.nodes[upstreamNodeID].outcomingLinks = append(mesoNet.nodes[upstreamNodeID].outcomingLinks, lastMesoLinkID)
+			mesoNet.nodes[downstreamMesoNode.ID].incomingLinks = append(mesoNet.nodes[downstreamMesoNode.ID].incomingLinks, lastMesoLinkID)
+
+			mesoNet.links[mesoLink.ID] = mesoLink
+			lastMesoLinkID += 1
+			upstreamNodeID = downstreamMesoNode.ID // This must be done since current upstream node is downstream node for next segment
+		}
+
+		// @TODO: Create microscopic links since it could be done here
+		// Consider to have some flag to enable/disable this feature
 	}
-	return ans
+	mesoNet.maxLinkID = lastMesoLinkID
+	return nil
 }

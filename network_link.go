@@ -180,3 +180,146 @@ func (link *NetworkLink) MaxLanes() int {
 	}
 	return max
 }
+
+// Prepares cut length for link
+func (link *NetworkLink) calcCutLen() {
+	// Defife a variable downstream_max_cut which is the maximum length of a cut that can be made downstream of the link,
+	// calculated as the maximum of the _length_of_short_cut and the difference between the last two elements in the link.lanes_change_point_list minus 3.
+	downStreamMaxCut := math.Max(shortcutLen, link.breakpoints[len(link.breakpoints)-1]-link.breakpoints[len(link.breakpoints)-2]-3)
+	if link.upstreamShortCut && link.downstreamShortCut {
+		totalLengthCut := 2 * shortcutLen * cutLenMin
+		_ = totalLengthCut
+		if link.lengthMetersOffset > totalLengthCut {
+			link.upstreamCutLen = shortcutLen
+			link.downstreamCutLen = shortcutLen
+		} else {
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLengthCut) * shortcutLen
+			link.downstreamCutLen = link.upstreamCutLen
+		}
+	} else if link.upstreamShortCut {
+		cutIdx := 0
+		cutPlaceFound := false
+		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
+			if link.lengthMetersOffset > math.Min(downStreamMaxCut, cutLen[i])+shortcutLen+cutLenMin {
+				cutIdx = i
+				cutPlaceFound = true
+				break
+			}
+		}
+		if cutPlaceFound {
+			link.upstreamCutLen = shortcutLen
+			link.downstreamCutLen = math.Min(downStreamMaxCut, cutLen[cutIdx])
+		} else {
+			downStreamCut := math.Min(downStreamMaxCut, cutLen[0])
+			totalLen := downStreamCut + shortcutLen + cutLenMin
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * shortcutLen
+			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
+		}
+	} else if link.downstreamShortCut {
+		cutIdx := 0
+		cutPlaceFound := false
+		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
+			if link.lengthMetersOffset > cutLen[i]+shortcutLen+cutLenMin {
+				cutIdx = i
+				cutPlaceFound = true
+				break
+			}
+		}
+		if cutPlaceFound {
+			link.upstreamCutLen = cutLen[cutIdx]
+			link.downstreamCutLen = shortcutLen
+		} else {
+			totalLen := cutLen[0] + shortcutLen + cutLenMin
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
+			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * shortcutLen
+		}
+	} else {
+		cutIdx := 0
+		cutPlaceFound := false
+		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
+			if link.lengthMetersOffset > cutLen[i]+math.Min(downStreamMaxCut, cutLen[i])+cutLenMin {
+				cutIdx = i
+				cutPlaceFound = true
+				break
+			}
+		}
+		if cutPlaceFound {
+			link.upstreamCutLen = cutLen[cutIdx]
+			link.downstreamCutLen = math.Min(downStreamMaxCut, cutLen[cutIdx])
+		} else {
+			downStreamCut := math.Min(downStreamMaxCut, cutLen[0])
+			totalLen := downStreamCut + cutLen[0] + cutLenMin
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
+			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
+		}
+	}
+}
+
+// Cuts redudant geometry
+func (link *NetworkLink) performCut() {
+
+	// Create copy for those since we will do mutations and want to keep original data
+	breakpoints := make([]float64, len(link.breakpoints))
+	copy(breakpoints, link.breakpoints)
+	link.lanesListCut = make([]int, len(link.lanesList))
+	copy(link.lanesListCut, link.lanesList)
+	link.lanesChangeCut = make([][]int, len(link.lanesChange))
+	copy(link.lanesChange, link.lanesChange)
+
+	breakIdx := 1
+	for breakIdx = 1; breakIdx < len(breakpoints); breakIdx++ {
+		if breakpoints[breakIdx] > link.upstreamCutLen {
+			break
+		}
+	}
+	breakpoints = append(breakpoints[breakIdx:])
+	breakpoints = append([]float64{link.upstreamCutLen}, breakpoints...)
+	link.lanesListCut = link.lanesListCut[breakIdx-1:]
+	link.lanesChange = link.lanesChange[breakIdx-1:]
+
+	breakIdx = len(breakpoints) - 2
+	for breakIdx := len(breakpoints) - 2; breakIdx >= 0; breakIdx-- {
+		if link.lengthMetersOffset-breakpoints[breakIdx] > link.downstreamCutLen {
+			break
+		}
+	}
+	breakpoints = breakpoints[:breakIdx+1]
+	breakpoints = append(breakpoints, link.lengthMetersOffset-link.downstreamCutLen)
+	link.lanesListCut = link.lanesListCut[:breakIdx+1]
+	link.lanesChange = link.lanesChange[:breakIdx+1]
+
+	for i := range link.lanesListCut {
+		start := breakpoints[i]
+		end := breakpoints[i+1]
+		geomCut := SubstringHaversine(link.geomOffset, start, end)
+		geomEuclideanCut := lineToSpherical(geomCut)
+		link.geomOffsetCut = append(link.geomOffsetCut, geomCut)
+		link.geomEuclideanOffsetCut = append(link.geomEuclideanOffsetCut, geomEuclideanCut)
+	}
+}
+
+func linksToSlice(links map[NetworkLinkID]*NetworkLink) []NetworkLinkID {
+	ans := make([]NetworkLinkID, 0, len(links))
+	for k := range links {
+		ans = append(ans, k)
+	}
+	return ans
+}
+
+type NetworkLinkMesoscopic struct {
+	geom          orb.LineString
+	geomEuclidean orb.LineString
+	lanesNum      int
+	lanesChange   []int
+
+	ID NetworkLinkID
+
+	sourceNodeID NetworkNodeID // Corresponds to ID of mesoscopic node (not to macro or OSM)
+	targetNodeID NetworkNodeID // Corresponds to ID of mesoscopic node (not to macro or OSM)
+
+	macroLinkID NetworkLinkID
+	macroNodeID NetworkNodeID
+	movementID  MovementID
+
+	isConnection bool
+}
