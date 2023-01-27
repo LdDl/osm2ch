@@ -1,13 +1,17 @@
 package osm2ch
 
 import (
+	"encoding/csv"
 	"fmt"
 	"math"
+	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geo"
+	"github.com/pkg/errors"
 )
 
 type NetworkMesoscopic struct {
@@ -272,11 +276,14 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 			}
 			mesoNet.expandedMesoNodes[sourceMacroNodeID] += 1
 			upstreamMesoNode = NetworkNodeMesoscopic{
-				ID:            sourceMacroNodeID*100 + NetworkNodeID(expNodesNum),
-				geom:          link.geomOffsetCut[0][0], // No explicit copy or clone method since Point is not slice, but array
-				geomEuclidean: link.geomEuclideanOffsetCut[0][0],
-				macroNodeID:   sourceMacroNodeID,
-				macroLinkID:   -1,
+				ID:               sourceMacroNodeID*100 + NetworkNodeID(expNodesNum),
+				geom:             link.geomOffsetCut[0][0], // No explicit copy or clone method since Point is not slice, but array
+				geomEuclidean:    link.geomEuclideanOffsetCut[0][0],
+				macroNodeID:      sourceMacroNodeID,
+				macroLinkID:      -1,
+				zoneID:           sourceMacroNode.zoneID,
+				activityLinkType: sourceMacroNode.activityLinkType,
+				boundaryType:     BOUNDARY_NONE,
 			}
 			mesoNet.nodes[upstreamMesoNode.ID] = &upstreamMesoNode
 		}
@@ -304,13 +311,18 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 					ID:            targetMacroNodeID*100 + NetworkNodeID(expNodesNum),
 					geom:          link.geomOffsetCut[segmentIdx][len(link.geomOffsetCut[segmentIdx])-1], // No explicit copy or clone method since Point is not slice, but array
 					geomEuclidean: link.geomEuclideanOffsetCut[segmentIdx][len(link.geomEuclideanOffsetCut[segmentIdx])-1],
+					boundaryType:  BOUNDARY_NONE,
 				}
 				if segmentIdx == segmentsToCut-1 {
 					downstreamMesoNode.macroNodeID = targetMacroNodeID
 					downstreamMesoNode.macroLinkID = -1
+					downstreamMesoNode.zoneID = targetMacroNode.zoneID
+					downstreamMesoNode.activityLinkType = targetMacroNode.activityLinkType
 				} else {
 					downstreamMesoNode.macroNodeID = -1
 					downstreamMesoNode.macroLinkID = link.ID
+					downstreamMesoNode.zoneID = -1
+					downstreamMesoNode.activityLinkType = LINK_UNDEFINED
 				}
 				mesoNet.nodes[downstreamMesoNode.ID] = &downstreamMesoNode
 			}
@@ -342,6 +354,32 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 		// @TODO: Create microscopic links since it could be done here
 		// Consider to have some flag to enable/disable this feature
 	}
+
+	// Update boundary type for each mesoscopic node
+	for _, mesoNode := range mesoNet.nodes {
+		if mesoNode.macroNodeID == -1 {
+			if mesoNode.macroLinkID == -1 {
+				fmt.Printf("Warning. Suspicious mesoscopic node %d: either macroscopic node ir link not found\n", mesoNode.ID)
+			} else {
+				mesoNode.boundaryType = BOUNDARY_NONE
+			}
+		} else {
+			macroNode, ok := macroNet.nodes[mesoNode.macroNodeID]
+			if !ok {
+				return fmt.Errorf("connectNodes(): Macroscopic node %d not found for mesoscopic node %d", mesoNode.macroNodeID, mesoNode.ID)
+			}
+			if macroNode.boundaryType != BOUNDARY_INCOME_OUTCOME && macroNode.boundaryType != BOUNDARY_NONE {
+				mesoNode.boundaryType = macroNode.boundaryType
+			} else {
+				if len(mesoNode.incomingLinks) != 0 {
+					mesoNode.boundaryType = BOUNDARY_INCOME_ONLY
+				} else {
+					mesoNode.boundaryType = BOUNDARY_OUTCOME_ONLY
+				}
+			}
+		}
+	}
+
 	mesoNet.maxLinkID = lastMesoLinkID
 	return nil
 }
@@ -480,4 +518,51 @@ func intSliceContains(slice []int, element int) bool {
 		}
 	}
 	return false
+}
+
+func (net *NetworkMesoscopic) ExportToCSV(fname string) error {
+
+	fnameParts := strings.Split(fname, ".csv")
+	fnameNodes := fmt.Sprintf(fnameParts[0] + "_meso_nodes.csv")
+	// fnameLinks := fmt.Sprintf(fnameParts[0] + "_meso_links.csv")
+
+	err := net.exportNodesToCSV(fnameNodes)
+	if err != nil {
+		return errors.Wrap(err, "Can't export nodes")
+	}
+	return nil
+}
+
+func (net *NetworkMesoscopic) exportNodesToCSV(fname string) error {
+	file, err := os.Create(fname)
+	if err != nil {
+		return errors.Wrap(err, "Can't create file")
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	writer.Comma = ';'
+
+	err = writer.Write([]string{"id", "zone_id", "macro_node_id", "macro_link_id", "activity_link_type", "boundary_type", "longitude", "latitude"})
+	if err != nil {
+		return errors.Wrap(err, "Can't write header")
+	}
+
+	for _, node := range net.nodes {
+		err = writer.Write([]string{
+			fmt.Sprintf("%d", node.ID),
+			fmt.Sprintf("%d", node.zoneID),
+			fmt.Sprintf("%d", node.macroNodeID),
+			fmt.Sprintf("%d", node.macroLinkID),
+			fmt.Sprintf("%s", node.activityLinkType),
+			fmt.Sprintf("%s", node.boundaryType),
+			fmt.Sprintf("%f", node.geom[0]),
+			fmt.Sprintf("%f", node.geom[1]),
+		})
+		if err != nil {
+			return errors.Wrap(err, "Can't write node")
+		}
+	}
+	return nil
 }

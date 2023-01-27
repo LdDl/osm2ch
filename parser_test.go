@@ -20,6 +20,19 @@ func TestParser(t *testing.T) {
 	}
 	netMacro.genActivityType()
 	netMacro.genMovement(verbose)
-	netMacro.genMesoscopicNetwork(verbose)
-	netMacro.ExportToCSV("network")
+	netMeso, err := netMacro.genMesoscopicNetwork(verbose)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	err = netMacro.ExportToCSV("network")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	err = netMeso.ExportToCSV("network")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 }
