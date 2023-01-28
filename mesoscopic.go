@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/encoding/wkt"
 	"github.com/paulmach/orb/geo"
 	"github.com/pkg/errors"
 )
 
 type NetworkMesoscopic struct {
 	nodes map[NetworkNodeID]*NetworkNodeMesoscopic
-	links map[NetworkLinkID]NetworkLinkMesoscopic
+	links map[NetworkLinkID]*NetworkLinkMesoscopic
 	// Storage to track number of generated mesoscopic nodes for each macroscopic node which is centroid
 	// Key: NodeID, Value: Number of expanded nodes
 	expandedMesoNodes map[NetworkNodeID]int
@@ -43,7 +44,7 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	st := time.Now()
 	mesoscopic := NetworkMesoscopic{
 		nodes:             make(map[NetworkNodeID]*NetworkNodeMesoscopic),
-		links:             make(map[NetworkLinkID]NetworkLinkMesoscopic),
+		links:             make(map[NetworkLinkID]*NetworkLinkMesoscopic),
 		expandedMesoNodes: make(map[NetworkNodeID]int),
 	}
 
@@ -224,6 +225,7 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	mesoscopic.generateLinks(net)
 	mesoscopic.connectLinks(net)
 	mesoscopic.updateBoundaryType(net)
+	mesoscopic.updateLinksProperties(net)
 	/* */
 
 	if verbose {
@@ -342,13 +344,16 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 				isConnection:  false,
 				movementID:    -1,
 				macroNodeID:   -1,
+				lengthMeters:  geo.LengthHaversign(link.geomOffsetCut[segmentIdx]),
+				// Default movement
+				movementCompositeType: MOVEMENT_NONE,
 			}
 
 			link.mesolinks = append(link.mesolinks, mesoLink.ID)
 			mesoNet.nodes[upstreamNodeID].outcomingLinks = append(mesoNet.nodes[upstreamNodeID].outcomingLinks, lastMesoLinkID)
 			mesoNet.nodes[downstreamMesoNode.ID].incomingLinks = append(mesoNet.nodes[downstreamMesoNode.ID].incomingLinks, lastMesoLinkID)
 
-			mesoNet.links[mesoLink.ID] = mesoLink
+			mesoNet.links[mesoLink.ID] = &mesoLink
 			lastMesoLinkID += 1
 			upstreamNodeID = downstreamMesoNode.ID // This must be done since current upstream node is downstream node for next segment
 		}
@@ -471,8 +476,11 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 					isConnection:  true,
 					movementID:    movement.ID,
 					macroNodeID:   macroNode.ID,
+					lengthMeters:  geo.LengthHaversign(orb.LineString{incomingMesoLink.geom[len(incomingMesoLink.geom)-1], outcomingMesoLink.geom[0]}),
+					// Inherit movement properties
+					movementCompositeType: movement.movementCompositeType,
 				}
-				mesoNet.links[mesoLink.ID] = mesoLink
+				mesoNet.links[mesoLink.ID] = &mesoLink
 				lastMesoLinkID += 1
 
 				// Update incident edges lists for nodes
@@ -518,6 +526,82 @@ func (mesoNet *NetworkMesoscopic) updateBoundaryType(macroNet *NetworkMacroscopi
 	return nil
 }
 
+// updateLinksProperties updates mesoscopic links properties
+func (mesoNet *NetworkMesoscopic) updateLinksProperties(macroNet *NetworkMacroscopic) error {
+	movementLinks := make(map[NetworkLinkID]struct{})
+
+	for _, mesoLink := range mesoNet.links {
+		if mesoLink.macroNodeID == -1 {
+			if mesoLink.macroLinkID == -1 {
+				fmt.Printf("Warning. Suspicious mesoscopic link %d: either macroscopic node ir link not found\n", mesoLink.ID)
+			} else {
+				// Inherit macroscopic link properties
+				macroLink, ok := macroNet.links[mesoLink.macroLinkID]
+				if !ok {
+					return fmt.Errorf("updateLinksProperties(): Macroscopic link %d not found for mesoscopic link %d", mesoLink.macroLinkID, mesoLink.ID)
+				}
+				mesoLink.linkType = macroLink.linkType
+				mesoLink.freeSpeed = macroLink.freeSpeed
+				mesoLink.capacity = macroLink.capacity
+				mesoLink.allowedAgentTypes = macroLink.allowedAgentTypes
+
+				// Reset macroscopic node properties to defaults
+				mesoLink.controlType = NOT_SIGNAL
+			}
+		} else {
+			// Collect movement-based links and inherit macroscopic link properties later
+			movementLinks[mesoLink.ID] = struct{}{}
+
+			// Inherit macroscopic node properties
+			macroNode, ok := macroNet.nodes[mesoLink.macroNodeID]
+			if !ok {
+				return fmt.Errorf("updateLinksProperties(): Macroscopic node %d not found for mesoscopic link %d", mesoLink.macroNodeID, mesoLink.ID)
+			}
+			mesoLink.controlType = macroNode.controlType
+
+			if mesoLink.movementID == -1 {
+				fmt.Printf("Warning. Suspicious mesoscopic link %d: it should have movement ID since it is movement-based\n", mesoLink.ID)
+			}
+		}
+
+		// Update movement. @TODO: probably redundant
+		if mesoLink.movementID != -1 {
+			movement, ok := macroNet.movement[mesoLink.movementID]
+			if !ok {
+				return fmt.Errorf("updateLinksProperties(): Movement %d not found for mesoscopic link %d", mesoLink.movementID, mesoLink.ID)
+			}
+			mesoLink.movementCompositeType = movement.movementCompositeType
+		}
+	}
+
+	// Inherit macroscopic link properties for movement links
+	for movementLinks := range movementLinks {
+		mesoLink, ok := mesoNet.links[movementLinks]
+		if !ok {
+			return fmt.Errorf("updateLinksProperties(): Movement link %d not found in mesoscopic network", movementLinks)
+		}
+		sourceMesoNode, ok := mesoNet.nodes[mesoLink.sourceNodeID]
+		if !ok {
+			return fmt.Errorf("updateLinksProperties(): Mesoscopic source node %d not found for mesoscopic link %d", mesoLink.sourceNodeID, mesoLink.ID)
+		}
+		if len(sourceMesoNode.incomingLinks) == 0 {
+			fmt.Printf("Warning. Mesoscopic link %d has no incoming links for source node %d. Skipping\n", mesoLink.ID, mesoLink.sourceNodeID)
+			continue
+		}
+		upstreamLinkID := sourceMesoNode.incomingLinks[0]
+		upstreamLink, ok := mesoNet.links[upstreamLinkID]
+		if !ok {
+			return fmt.Errorf("updateLinksProperties(): Mesoscopic upstream link %d not found for mesoscopic link %d. Source node is %d", upstreamLinkID, mesoLink.ID, mesoLink.sourceNodeID)
+		}
+		// Inherit upstream macroscopic link properties
+		mesoLink.linkType = upstreamLink.linkType
+		mesoLink.freeSpeed = upstreamLink.freeSpeed
+		mesoLink.capacity = upstreamLink.capacity
+		mesoLink.allowedAgentTypes = upstreamLink.allowedAgentTypes
+	}
+	return nil
+}
+
 // intSliceContains returns true if element is in slice
 func intSliceContains(slice []int, element int) bool {
 	for _, el := range slice {
@@ -532,11 +616,60 @@ func (net *NetworkMesoscopic) ExportToCSV(fname string) error {
 
 	fnameParts := strings.Split(fname, ".csv")
 	fnameNodes := fmt.Sprintf(fnameParts[0] + "_meso_nodes.csv")
-	// fnameLinks := fmt.Sprintf(fnameParts[0] + "_meso_links.csv")
+	fnameLinks := fmt.Sprintf(fnameParts[0] + "_meso_links.csv")
 
 	err := net.exportNodesToCSV(fnameNodes)
 	if err != nil {
 		return errors.Wrap(err, "Can't export nodes")
+	}
+
+	err = net.exportLinksToCSV(fnameLinks)
+	if err != nil {
+		return errors.Wrap(err, "Can't export links")
+	}
+	return nil
+}
+
+func (net *NetworkMesoscopic) exportLinksToCSV(fname string) error {
+	file, err := os.Create(fname)
+	if err != nil {
+		return errors.Wrap(err, "Can't create file")
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	writer.Comma = ';'
+
+	err = writer.Write([]string{"id", "source_node", "target_node", "macro_node_id", "macro_link_id", "link_type", "control_type", "movement_composite_type", "allowed_agent_types", "lanes", "free_speed", "capacity", "length_meters", "geom"})
+	if err != nil {
+		return errors.Wrap(err, "Can't write header")
+	}
+
+	for _, link := range net.links {
+		allowedAgentTypes := make([]string, len(link.allowedAgentTypes))
+		for i, agentType := range link.allowedAgentTypes {
+			allowedAgentTypes[i] = fmt.Sprintf("%s", agentType)
+		}
+		err = writer.Write([]string{
+			fmt.Sprintf("%d", link.ID),
+			fmt.Sprintf("%d", link.sourceNodeID),
+			fmt.Sprintf("%d", link.targetNodeID),
+			fmt.Sprintf("%d", link.macroNodeID),
+			fmt.Sprintf("%d", link.macroLinkID),
+			fmt.Sprintf("%s", link.linkType),
+			fmt.Sprintf("%s", link.controlType),
+			fmt.Sprintf("%s", link.movementCompositeType),
+			strings.Join(allowedAgentTypes, ","),
+			fmt.Sprintf("%d", link.lanesNum),
+			fmt.Sprintf("%f", link.freeSpeed),
+			fmt.Sprintf("%d", link.capacity),
+			fmt.Sprintf("%f", link.lengthMeters),
+			fmt.Sprintf("%s", wkt.MarshalString(link.geom)),
+		})
+		if err != nil {
+			return errors.Wrap(err, "Can't write link")
+		}
 	}
 	return nil
 }

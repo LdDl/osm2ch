@@ -322,5 +322,13 @@ type NetworkLinkMesoscopic struct {
 	macroNodeID NetworkNodeID
 	movementID  MovementID
 
+	movementCompositeType MovementCompositeType // Inherited from movement
+	controlType           ControlType           // Inherited from macroscopic node
+	linkType              LinkType              // Inherited either from macroscopic link or from first incoming incident edge in macroscopic node
+	freeSpeed             float64               // Inherited either from macroscopic link or from first incoming incident edge in macroscopic node
+	capacity              int                   // Inherited either from macroscopic link or from first incoming incident edge in macroscopic node
+	allowedAgentTypes     []AgentType           // Inherited either from macroscopic link or from first incoming incident edge in macroscopic node
+
+	lengthMeters float64
 	isConnection bool
 }
