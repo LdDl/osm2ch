@@ -1,6 +1,8 @@
 package osm2ch
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ActivityType uint16
 
@@ -58,6 +60,7 @@ func (net *NetworkMacroscopic) genActivityType() error {
 					maxLinkType = linkType
 				}
 			}
+			// @TODO: What to do when thee are several link types with the same max count?
 			if maxLinkType > 0 {
 				node.activityType = ACTIVITY_LINK
 				node.activityLinkType = maxLinkType

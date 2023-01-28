@@ -223,6 +223,7 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	/* Build meso/micro */
 	mesoscopic.generateLinks(net)
 	mesoscopic.connectLinks(net)
+	mesoscopic.updateBoundaryType(net)
 	/* */
 
 	if verbose {
@@ -313,6 +314,7 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 					geomEuclidean: link.geomEuclideanOffsetCut[segmentIdx][len(link.geomEuclideanOffsetCut[segmentIdx])-1],
 					boundaryType:  BOUNDARY_NONE,
 				}
+
 				if segmentIdx == segmentsToCut-1 {
 					downstreamMesoNode.macroNodeID = targetMacroNodeID
 					downstreamMesoNode.macroLinkID = -1
@@ -353,31 +355,6 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 
 		// @TODO: Create microscopic links since it could be done here
 		// Consider to have some flag to enable/disable this feature
-	}
-
-	// Update boundary type for each mesoscopic node
-	for _, mesoNode := range mesoNet.nodes {
-		if mesoNode.macroNodeID == -1 {
-			if mesoNode.macroLinkID == -1 {
-				fmt.Printf("Warning. Suspicious mesoscopic node %d: either macroscopic node ir link not found\n", mesoNode.ID)
-			} else {
-				mesoNode.boundaryType = BOUNDARY_NONE
-			}
-		} else {
-			macroNode, ok := macroNet.nodes[mesoNode.macroNodeID]
-			if !ok {
-				return fmt.Errorf("connectNodes(): Macroscopic node %d not found for mesoscopic node %d", mesoNode.macroNodeID, mesoNode.ID)
-			}
-			if macroNode.boundaryType != BOUNDARY_INCOME_OUTCOME && macroNode.boundaryType != BOUNDARY_NONE {
-				mesoNode.boundaryType = macroNode.boundaryType
-			} else {
-				if len(mesoNode.incomingLinks) != 0 {
-					mesoNode.boundaryType = BOUNDARY_INCOME_ONLY
-				} else {
-					mesoNode.boundaryType = BOUNDARY_OUTCOME_ONLY
-				}
-			}
-		}
 	}
 
 	mesoNet.maxLinkID = lastMesoLinkID
@@ -507,6 +484,37 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 		}
 	}
 	mesoNet.maxLinkID = lastMesoLinkID
+	return nil
+}
+
+// updateBoundaryType updates boundary type for each mesoscopic node
+//
+// this function should be called after all incident edges for nodes are set
+//
+func (mesoNet *NetworkMesoscopic) updateBoundaryType(macroNet *NetworkMacroscopic) error {
+	for _, mesoNode := range mesoNet.nodes {
+		if mesoNode.macroNodeID == -1 {
+			if mesoNode.macroLinkID == -1 {
+				fmt.Printf("Warning. Suspicious mesoscopic node %d: either macroscopic node ir link not found\n", mesoNode.ID)
+			} else {
+				mesoNode.boundaryType = BOUNDARY_NONE
+			}
+		} else {
+			macroNode, ok := macroNet.nodes[mesoNode.macroNodeID]
+			if !ok {
+				return fmt.Errorf("connectNodes(): Macroscopic node %d not found for mesoscopic node %d", mesoNode.macroNodeID, mesoNode.ID)
+			}
+			if macroNode.boundaryType != BOUNDARY_INCOME_OUTCOME {
+				mesoNode.boundaryType = macroNode.boundaryType
+			} else {
+				if len(mesoNode.incomingLinks) != 0 {
+					mesoNode.boundaryType = BOUNDARY_INCOME_ONLY
+				} else {
+					mesoNode.boundaryType = BOUNDARY_OUTCOME_ONLY
+				}
+			}
+		}
+	}
 	return nil
 }
 
