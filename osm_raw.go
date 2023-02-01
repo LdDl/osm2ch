@@ -85,7 +85,7 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 				} else {
 					// Reversible or alternating
 					// Those are depends on time conditions
-					// @todo: need to implement
+					// @TODO: need to implement
 					if _, found := onewayReversible[onewayText]; found {
 						oneway = false
 					} else {

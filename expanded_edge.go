@@ -13,7 +13,7 @@ type ExpandedEdge struct {
 	TargeComponent  expandedEdgeComponent
 	WasOneway       bool
 	CostMeters      float64
-	/* CostSeconds  float64 */ //@todo: consider cost customization
+	/* CostSeconds  float64 */ //@TODO: consider cost customization
 	Geom                       []GeoPoint
 }
 

@@ -60,7 +60,7 @@ func (net *NetworkMacroscopic) genActivityType() error {
 					maxLinkType = linkType
 				}
 			}
-			// @TODO: What to do when thee are several link types with the same max count?
+			// @TODO: What to do when there are several link types with the same max count?
 			if maxLinkType > 0 {
 				node.activityType = ACTIVITY_LINK
 				node.activityLinkType = maxLinkType

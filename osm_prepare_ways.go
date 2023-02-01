@@ -15,7 +15,7 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 	data.waysMedium = make([]*WayData, 0, len(data.ways))
 	for _, way := range data.ways {
 		if way.isPOI() {
-			// @todo: handle POI
+			// @TODO: handle POI
 			continue
 		}
 
@@ -34,7 +34,7 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 		}
 		if way.isHighway() {
 			if way.isHighwayPOI() {
-				// @todo: handle POI
+				// @TODO: handle POI
 				continue
 			}
 			// Ignore ways `area` tag provided
@@ -85,15 +85,15 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 			}
 			data.waysMedium = append(data.waysMedium, way)
 		} else if way.isRailway() {
-			// @todo: handle railways
+			// @TODO: handle railways
 			if way.isRailwayPOI() {
-				// @todo: handle POI
+				// @TODO: handle POI
 				continue
 			}
 		} else if way.isAeroway() {
-			// @todo: handle aeroways
+			// @TODO: handle aeroways
 			if way.isAerowayPOI() {
-				// @todo: handle POI
+				// @TODO: handle POI
 				continue
 			}
 		} else {
