@@ -13,6 +13,7 @@ func TestParser(t *testing.T) {
 	t.Log(parser)
 	verbose := true
 
+	/* Macroscopic */
 	netMacro, err := parser.createNetwork(verbose)
 	if err != nil {
 		t.Error(err)
@@ -20,19 +21,36 @@ func TestParser(t *testing.T) {
 	}
 	netMacro.genActivityType()
 	netMacro.genMovement(verbose)
+
+	/* Mesoscopic */
 	netMeso, err := netMacro.genMesoscopicNetwork(verbose)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	err = netMacro.ExportToCSV("network")
+
+	/* Microscopic */
+	netMicro, err := genMicroscopicNetwork(netMacro, netMeso, verbose)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	err = netMeso.ExportToCSV("network")
+
+	outFile := "network"
+	err = netMacro.ExportToCSV(outFile)
 	if err != nil {
 		t.Error(err)
 		return
 	}
+	err = netMeso.ExportToCSV(outFile)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	_ = netMicro
+	// err = netMicro.ExportToCSV(outFile)
+	// if err != nil {
+	// 	t.Error(err)
+	// 	return
+	// }
 }
