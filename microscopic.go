@@ -23,7 +23,6 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 		maxLinkID: NetworkLinkID(0),
 		maxNodeID: NetworkNodeID(0),
 	}
-
 	// Iterate over macroscopic links
 	for _, macroLink := range macroNet.links {
 		fmt.Println("create data for link", macroLink.ID)
@@ -53,6 +52,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 
 			fmt.Println("\tmesolink", mesoLinkID)
 
+			laneGeometriesEuclidean := []orb.LineString{}
 			laneGeometries := []orb.LineString{}
 			bikeGeometry := orb.LineString{}
 			walkGeometry := orb.LineString{}
@@ -62,13 +62,18 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				laneOffset := (lanesNumberInBetween + float64(i)) * laneWidth
 				fmt.Println("\titerate lane", i, laneOffset)
 				// If offset is too small then neglect it and copy original geometry
-				// Otherwise evaluate geometry
-				if !(laneOffset < -1e-2 || laneOffset > 1e-2) {
-					laneGeometries = append(laneGeometries, mesoLink.geom.Clone())
+				// Otherwise evaluate offset for geometry
+				if laneOffset < -1e-2 || laneOffset > 1e-2 {
+					laneGeomEuclidean := offsetCurve(mesoLink.geomEuclidean, -laneOffset) // Use "-" sign to make offset to the right side
+					if laneOffset > 0 {
+						laneGeomEuclidean.Reverse()
+					}
+					laneGeometriesEuclidean = append(laneGeometriesEuclidean, laneGeomEuclidean)
+					laneGeometries = append(laneGeometries, lineToSpherical(laneGeomEuclidean))
 				} else {
-
+					laneGeometriesEuclidean = append(laneGeometriesEuclidean, mesoLink.geomEuclidean.Clone())
+					laneGeometries = append(laneGeometries, mesoLink.geom.Clone())
 				}
-				// @TODO: continue
 			}
 			if bike && !walk {
 				// Prepare only bike geometry: calculate offset and evaluate geometry

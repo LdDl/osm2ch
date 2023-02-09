@@ -293,7 +293,7 @@ func (link *NetworkLink) performCut() {
 		start := breakpoints[i]
 		end := breakpoints[i+1]
 		geomCut := SubstringHaversine(link.geomOffset, start, end)
-		geomEuclideanCut := lineToSpherical(geomCut)
+		geomEuclideanCut := lineToEuclidean(geomCut)
 		link.geomOffsetCut = append(link.geomOffsetCut, geomCut)
 		link.geomEuclideanOffsetCut = append(link.geomEuclideanOffsetCut, geomEuclideanCut)
 	}
