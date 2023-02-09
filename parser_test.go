@@ -30,7 +30,7 @@ func TestParser(t *testing.T) {
 	}
 
 	/* Microscopic */
-	netMicro, err := genMicroscopicNetwork(netMacro, netMeso, verbose)
+	netMicro, err := genMicroscopicNetwork(netMacro, netMeso, false, verbose)
 	if err != nil {
 		t.Error(err)
 		return

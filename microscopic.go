@@ -3,6 +3,13 @@ package osm2ch
 import (
 	"fmt"
 	"time"
+
+	"github.com/paulmach/orb"
+)
+
+const (
+	bikeLaneWidth = 0.5
+	walkLaneWidth = 0.5
 )
 
 func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic, separateBikeWalk, verbose bool) (*NetworkMicroscopic, error) {
@@ -19,6 +26,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 
 	// Iterate over macroscopic links
 	for _, macroLink := range macroNet.links {
+		fmt.Println("create data for link", macroLink.ID)
 		// Evaluate multimodal agent types for macroscopic link
 		agentTypes := macroLink.allowedAgentTypes
 		var multiModalAgentTypes []AgentType
@@ -31,16 +39,70 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 			copy(multiModalAgentTypes, agentTypes)
 		}
 
+		originalLanesNum := float64(macroLink.lanesList[0])
+
 		// Iterate over mesoscopic links and create microscopic nodes
 		for _, mesoLinkID := range macroLink.mesolinks {
 			mesoLink, ok := mesoNet.links[mesoLinkID]
 			if !ok {
-				return nil, fmt.Errorf("genMicroscopicNetwork(): Mesoscopic link %d not found for macroscopic link", mesoLinkID, macroLink.ID)
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Mesoscopic link %d not found for macroscopic link %d", mesoLinkID, macroLink.ID)
 			}
-			_ = mesoLink
-			_ = bike
-			_ = walk
-			// @TODO: continue
+
+			laneChangesLeft := float64(mesoLink.lanesChange[0])
+			lanesNumberInBetween := -1 * (originalLanesNum/2 - 0.5 + laneChangesLeft)
+
+			fmt.Println("\tmesolink", mesoLinkID)
+
+			laneGeometries := []orb.LineString{}
+			bikeGeometry := orb.LineString{}
+			walkGeometry := orb.LineString{}
+			laneOffset := 0.0
+			// Iterate over mesoscopic link lanes and prepare geometries
+			for i := 0; i < mesoLink.lanesNum; i++ {
+				laneOffset := (lanesNumberInBetween + float64(i)) * laneWidth
+				fmt.Println("\titerate lane", i, laneOffset)
+				// If offset is too small then neglect it and copy original geometry
+				// Otherwise evaluate geometry
+				if !(laneOffset < -1e-2 || laneOffset > 1e-2) {
+					laneGeometries = append(laneGeometries, mesoLink.geom.Clone())
+				} else {
+
+				}
+				// @TODO: continue
+			}
+			if bike && !walk {
+				// Prepare only bike geometry: calculate offset and evaluate geometry
+				bikeLaneOffset := laneOffset + bikeLaneWidth
+				if !(bikeLaneOffset < -1e-2 || bikeLaneOffset > 1e-2) {
+					bikeGeometry = mesoLink.geom.Clone()
+				} else {
+					// @TODO: continue
+				}
+			} else if !bike && walk {
+				// Prepare only walk geometry: calculate offset and evaluate geometry
+				walkLaneOffset := laneOffset + walkLaneWidth
+				if !(walkLaneOffset < -1e-2 || walkLaneOffset > 1e-2) {
+					walkGeometry = mesoLink.geom.Clone()
+				} else {
+					// @TODO: continue
+				}
+			} else if bike && walk {
+				// Prepare both bike and walk geometry: calculate two offsets and evaluate geometries
+				bikeLaneOffset := laneOffset + bikeLaneWidth
+				walkLaneOffset := laneOffset + walkLaneWidth
+				if !(bikeLaneOffset < -1e-2 || bikeLaneOffset > 1e-2) {
+					bikeGeometry = mesoLink.geom.Clone()
+				} else {
+					// @TODO: continue
+				}
+				if !(walkLaneOffset < -1e-2 || walkLaneOffset > 1e-2) {
+					walkGeometry = mesoLink.geom.Clone()
+				} else {
+					// @TODO: continue
+				}
+			}
+			_ = bikeGeometry
+			_ = walkGeometry
 		}
 	}
 	if verbose {
