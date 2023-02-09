@@ -56,8 +56,13 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 
 			laneGeometriesEuclidean := []orb.LineString{}
 			laneGeometries := []orb.LineString{}
+
+			bikeGeometryEuclidean := orb.LineString{}
 			bikeGeometry := orb.LineString{}
+
+			walkGeometryEuclidean := orb.LineString{}
 			walkGeometry := orb.LineString{}
+
 			laneOffset := 0.0
 			// Iterate over mesoscopic link lanes and prepare geometries
 			for i := 0; i < mesoLink.lanesNum; i++ {
@@ -80,32 +85,52 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 			if bike && !walk {
 				// Prepare only bike geometry: calculate offset and evaluate geometry
 				bikeLaneOffset := laneOffset + bikeLaneWidth
-				if !(bikeLaneOffset < -1e-2 || bikeLaneOffset > 1e-2) {
-					bikeGeometry = mesoLink.geom.Clone()
+				if bikeLaneOffset < -1e-2 || bikeLaneOffset > 1e-2 {
+					bikeGeometryEuclidean = offsetCurve(mesoLink.geomEuclidean, -bikeLaneOffset)
+					if bikeLaneOffset > 0 {
+						bikeGeometryEuclidean.Reverse()
+					}
+					bikeGeometry = lineToSpherical(bikeGeometryEuclidean)
 				} else {
-					// @TODO: continue
+					bikeGeometryEuclidean = mesoLink.geomEuclidean.Clone()
+					bikeGeometry = mesoLink.geom.Clone()
 				}
 			} else if !bike && walk {
 				// Prepare only walk geometry: calculate offset and evaluate geometry
 				walkLaneOffset := laneOffset + walkLaneWidth
-				if !(walkLaneOffset < -1e-2 || walkLaneOffset > 1e-2) {
-					walkGeometry = mesoLink.geom.Clone()
+				if walkLaneOffset < -1e-2 || walkLaneOffset > 1e-2 {
+					walkGeometryEuclidean = offsetCurve(mesoLink.geomEuclidean, -walkLaneOffset)
+					if walkLaneOffset > 0 {
+						walkGeometryEuclidean.Reverse()
+					}
+					walkGeometry = lineToSpherical(walkGeometryEuclidean)
 				} else {
-					// @TODO: continue
+					walkGeometryEuclidean = mesoLink.geomEuclidean.Clone()
+					walkGeometry = mesoLink.geom.Clone()
 				}
 			} else if bike && walk {
 				// Prepare both bike and walk geometry: calculate two offsets and evaluate geometries
 				bikeLaneOffset := laneOffset + bikeLaneWidth
 				walkLaneOffset := laneOffset + walkLaneWidth
-				if !(bikeLaneOffset < -1e-2 || bikeLaneOffset > 1e-2) {
+				if bikeLaneOffset < -1e-2 || bikeLaneOffset > 1e-2 {
+					bikeGeometryEuclidean = offsetCurve(mesoLink.geomEuclidean, -bikeLaneOffset)
+					if bikeLaneOffset > 0 {
+						bikeGeometryEuclidean.Reverse()
+					}
+					bikeGeometry = lineToSpherical(bikeGeometryEuclidean)
+				} else {
+					bikeGeometryEuclidean = mesoLink.geomEuclidean.Clone()
 					bikeGeometry = mesoLink.geom.Clone()
-				} else {
-					// @TODO: continue
 				}
-				if !(walkLaneOffset < -1e-2 || walkLaneOffset > 1e-2) {
-					walkGeometry = mesoLink.geom.Clone()
+				if walkLaneOffset < -1e-2 || walkLaneOffset > 1e-2 {
+					walkGeometryEuclidean = offsetCurve(mesoLink.geomEuclidean, -walkLaneOffset)
+					if walkLaneOffset > 0 {
+						walkGeometryEuclidean.Reverse()
+					}
+					walkGeometry = lineToSpherical(walkGeometryEuclidean)
 				} else {
-					// @TODO: continue
+					walkGeometryEuclidean = mesoLink.geomEuclidean.Clone()
+					walkGeometry = mesoLink.geom.Clone()
 				}
 			}
 			// Calculate number of cell which fit into link
