@@ -15,7 +15,6 @@ const (
 	laneWidth   = 3.5
 	shortcutLen = 0.1
 	cutLenMin   = 2.0
-	cellLength  = 4.5
 )
 
 var (

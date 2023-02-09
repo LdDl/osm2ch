@@ -2,6 +2,7 @@ package osm2ch
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/paulmach/orb"
@@ -10,6 +11,7 @@ import (
 const (
 	bikeLaneWidth = 0.5
 	walkLaneWidth = 0.5
+	cellLength    = 4.5
 )
 
 func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic, separateBikeWalk, verbose bool) (*NetworkMicroscopic, error) {
@@ -106,6 +108,10 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 					// @TODO: continue
 				}
 			}
+			// Calculate number of cell which fit into link
+			// If cell length > link length then use only one cell
+			cellsNum := math.Max(1.0, math.Round(mesoLink.lengthMeters/cellLength))
+			fmt.Println("\tcells", cellsNum)
 			_ = bikeGeometry
 			_ = walkGeometry
 		}
