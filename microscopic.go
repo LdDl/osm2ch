@@ -28,6 +28,8 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 	}
 	fmt.Println()
 
+	lastNodeID := microscopic.maxNodeID
+
 	// Iterate over macroscopic links
 	for _, macroLink := range macroNet.links {
 		// fmt.Println("create data for link", macroLink.ID)
@@ -182,8 +184,63 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 					walkMicroNodesGeometriesEuclidean = append(walkMicroNodesGeometriesEuclidean, pointToEuclidean(point))
 				}
 			}
+
+			// Prepare microscopic nodes for each lane of mesoscopic link
+			for i := 0; i < mesoLink.lanesNum; i++ {
+				laneNodes := []NetworkNodeID{}
+				for j, microNodeGeom := range microNodesGeometries[i] {
+					microNode := NetworkNodeMicroscopic{
+						ID:                         lastNodeID,
+						geom:                       microNodeGeom,
+						geomEuclidead:              microNodesGeometriesEuclidean[i][j],
+						mesoLinkID:                 mesoLink.ID,
+						laneID:                     i + 1,
+						isLinkUpstreamTargetNode:   false,
+						isLinkDownstreamTargetNode: false,
+					}
+					laneNodes = append(laneNodes, microNode.ID)
+					microscopic.nodes[microNode.ID] = &microNode
+					lastNodeID++
+				}
+				mesoLink.microNodesPerLane = append(mesoLink.microNodesPerLane, laneNodes)
+			}
+			if bike {
+				for j, microNodeGeom := range bikeMicroNodesGeometries {
+					microNode := NetworkNodeMicroscopic{
+						ID:                         lastNodeID,
+						geom:                       microNodeGeom,
+						geomEuclidead:              bikeMicroNodesGeometriesEuclidean[j],
+						mesoLinkID:                 mesoLink.ID,
+						laneID:                     -1,
+						isLinkUpstreamTargetNode:   false,
+						isLinkDownstreamTargetNode: false,
+					}
+					microscopic.nodes[microNode.ID] = &microNode
+					mesoLink.microNodesBikeLane = append(mesoLink.microNodesBikeLane, microNode.ID)
+					lastNodeID++
+				}
+			}
+			if walk {
+				for j, microNodeGeom := range walkMicroNodesGeometries {
+					microNode := NetworkNodeMicroscopic{
+						ID:                         lastNodeID,
+						geom:                       microNodeGeom,
+						geomEuclidead:              walkMicroNodesGeometriesEuclidean[j],
+						mesoLinkID:                 mesoLink.ID,
+						laneID:                     -2,
+						isLinkUpstreamTargetNode:   false,
+						isLinkDownstreamTargetNode: false,
+					}
+					microscopic.nodes[microNode.ID] = &microNode
+					mesoLink.microNodesWalkLane = append(mesoLink.microNodesWalkLane, microNode.ID)
+					lastNodeID++
+				}
+			}
 		}
+		fmt.Println(lastNodeID)
 	}
+
+	microscopic.maxNodeID = lastNodeID
 	if verbose {
 		fmt.Printf("Done in %v\n", time.Since(st))
 	}

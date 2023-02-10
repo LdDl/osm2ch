@@ -28,4 +28,9 @@ type NetworkLinkMesoscopic struct {
 
 	lengthMeters float64
 	isConnection bool
+
+	/* Microscopic */
+	microNodesPerLane  [][]NetworkNodeID
+	microNodesBikeLane []NetworkNodeID
+	microNodesWalkLane []NetworkNodeID
 }
