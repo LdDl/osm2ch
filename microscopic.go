@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/geo"
 )
 
 const (
@@ -25,9 +26,11 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 		maxLinkID: NetworkLinkID(0),
 		maxNodeID: NetworkNodeID(0),
 	}
+	fmt.Println()
+
 	// Iterate over macroscopic links
 	for _, macroLink := range macroNet.links {
-		fmt.Println("create data for link", macroLink.ID)
+		// fmt.Println("create data for link", macroLink.ID)
 		// Evaluate multimodal agent types for macroscopic link
 		agentTypes := macroLink.allowedAgentTypes
 		var multiModalAgentTypes []AgentType
@@ -52,7 +55,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 			laneChangesLeft := float64(mesoLink.lanesChange[0])
 			lanesNumberInBetween := -1 * (originalLanesNum/2 - 0.5 + laneChangesLeft)
 
-			fmt.Println("\tmesolink", mesoLinkID)
+			// fmt.Println("\tmesolink", mesoLinkID)
 
 			laneGeometriesEuclidean := []orb.LineString{}
 			laneGeometries := []orb.LineString{}
@@ -67,7 +70,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 			// Iterate over mesoscopic link lanes and prepare geometries
 			for i := 0; i < mesoLink.lanesNum; i++ {
 				laneOffset := (lanesNumberInBetween + float64(i)) * laneWidth
-				fmt.Println("\titerate lane", i, laneOffset)
+				// fmt.Println("\titerate lane", i, laneOffset)
 				// If offset is too small then neglect it and copy original geometry
 				// Otherwise evaluate offset for geometry
 				if laneOffset < -1e-2 || laneOffset > 1e-2 {
@@ -136,9 +139,49 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 			// Calculate number of cell which fit into link
 			// If cell length > link length then use only one cell
 			cellsNum := math.Max(1.0, math.Round(mesoLink.lengthMeters/cellLength))
-			fmt.Println("\tcells", cellsNum)
-			_ = bikeGeometry
-			_ = walkGeometry
+			// Loop over lanes, get interpolated point for each cell
+			// and collect them
+			microNodesGeometries := [][]orb.Point{}
+			microNodesGeometriesEuclidean := [][]orb.Point{}
+
+			bikeMicroNodesGeometries := []orb.Point{}
+			bikeMicroNodesGeometriesEuclidean := []orb.Point{}
+
+			walkMicroNodesGeometries := []orb.Point{}
+			walkMicroNodesGeometriesEuclidean := []orb.Point{}
+
+			for _, laneGeom := range laneGeometries {
+				laneNodes := []orb.Point{}
+				laneNodesEuclidean := []orb.Point{}
+
+				for i := 0; i < int(cellsNum)+1; i++ {
+					fraction := float64(i) / float64(cellsNum)
+					distance := mesoLink.lengthMeters * fraction
+					point, _ := geo.PointAtDistanceAlongLine(laneGeom, distance)
+					laneNodes = append(laneNodes, point)
+					laneNodesEuclidean = append(laneNodesEuclidean, pointToEuclidean(point))
+				}
+				microNodesGeometries = append(microNodesGeometries, laneNodes)
+				microNodesGeometriesEuclidean = append(microNodesGeometriesEuclidean, laneNodesEuclidean)
+			}
+			if bike {
+				for i := 0; i < int(cellsNum)+1; i++ {
+					fraction := float64(i) / float64(cellsNum)
+					distance := mesoLink.lengthMeters * fraction
+					point, _ := geo.PointAtDistanceAlongLine(bikeGeometry, distance)
+					bikeMicroNodesGeometries = append(bikeMicroNodesGeometries, point)
+					bikeMicroNodesGeometriesEuclidean = append(bikeMicroNodesGeometriesEuclidean, pointToEuclidean(point))
+				}
+			}
+			if walk {
+				for i := 0; i < int(cellsNum)+1; i++ {
+					fraction := float64(i) / float64(cellsNum)
+					distance := mesoLink.lengthMeters * fraction
+					point, _ := geo.PointAtDistanceAlongLine(walkGeometry, distance)
+					walkMicroNodesGeometries = append(walkMicroNodesGeometries, point)
+					walkMicroNodesGeometriesEuclidean = append(walkMicroNodesGeometriesEuclidean, pointToEuclidean(point))
+				}
+			}
 		}
 	}
 	if verbose {
