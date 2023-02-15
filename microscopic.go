@@ -237,7 +237,125 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				}
 			}
 		}
-		fmt.Println(lastNodeID)
+
+		if len(macroLink.mesolinks) == 0 {
+			fmt.Printf("[WARNING]: genMicroscopicNetwork(): Suspicious macroscopic link %v: no mesoscopic links\n", macroLink.ID)
+			continue
+		}
+
+		// Mark upstream and downstream nodes for first and last mesoscopic link
+		firstMesoLinkID := macroLink.mesolinks[0]
+		firstMesoLink, ok := mesoNet.links[firstMesoLinkID]
+		if !ok {
+			return nil, fmt.Errorf("genMicroscopicNetwork(): First mesoscopic link %d not found for macroscopic link %d", firstMesoLinkID, macroLink.ID)
+		}
+		for _, microNodeLane := range firstMesoLink.microNodesPerLane {
+			// @todo: check size of nodes per lane slice
+			firstNodeID := microNodeLane[0]
+			firstNode, ok := microscopic.nodes[firstNodeID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for first mesoscopic link %d for macroscopic link %d", firstNodeID, firstMesoLinkID, macroLink.ID)
+			}
+			firstNode.isLinkUpstreamTargetNode = true
+		}
+		if bike {
+			// @todo: check size of microNodeLane
+			firstNodeID := firstMesoLink.microNodesBikeLane[0]
+			firstNode, ok := microscopic.nodes[firstNodeID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for first BIKE mesoscopic link %d for macroscopic link %d", firstNodeID, firstMesoLinkID, macroLink.ID)
+			}
+			firstNode.isLinkUpstreamTargetNode = true
+		}
+		if walk {
+			// @todo: check size of microNodeLane
+			firstNodeID := firstMesoLink.microNodesWalkLane[0]
+			firstNode, ok := microscopic.nodes[firstNodeID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for first WALK mesoscopic link %d for macroscopic link %d", firstNodeID, firstMesoLinkID, macroLink.ID)
+			}
+			firstNode.isLinkUpstreamTargetNode = true
+		}
+
+		lastMesoLinkID := macroLink.mesolinks[len(macroLink.mesolinks)-1]
+		lastMesoLink, ok := mesoNet.links[lastMesoLinkID]
+		if !ok {
+			return nil, fmt.Errorf("genMicroscopicNetwork(): Last mesoscopic link %d not found for macroscopic link %d", lastMesoLinkID, macroLink.ID)
+		}
+		for _, microNodeLane := range lastMesoLink.microNodesPerLane {
+			// @todo: check size of microNodeLane
+			lastNodeID := microNodeLane[len(microNodeLane)-1]
+			lastNode, ok := microscopic.nodes[lastNodeID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for last mesoscopic link %d for macroscopic link %d", lastNodeID, lastMesoLinkID, macroLink.ID)
+			}
+			lastNode.isLinkDownstreamTargetNode = true
+		}
+		if bike {
+			// @todo: check size of microNodeLane
+			lastNodeID := lastMesoLink.microNodesBikeLane[len(lastMesoLink.microNodesBikeLane)-1]
+			lastNode, ok := microscopic.nodes[lastNodeID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for last BIKE mesoscopic link %d for macroscopic link %d", lastNodeID, lastMesoLinkID, macroLink.ID)
+			}
+			lastNode.isLinkDownstreamTargetNode = true
+		}
+		if walk {
+			// @todo: check size of microNodeLane
+			lastNodeID := lastMesoLink.microNodesWalkLane[len(lastMesoLink.microNodesWalkLane)-1]
+			lastNode, ok := microscopic.nodes[lastNodeID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for last WALK mesoscopic link %d for macroscopic link %d", lastNodeID, lastMesoLinkID, macroLink.ID)
+			}
+			lastNode.isLinkDownstreamTargetNode = true
+		}
+
+		// Post-process microscopics nodes between two adjacent mesoscopic links
+		for i := 0; i < len(macroLink.mesolinks)-1; i++ {
+			upstreamMesolinkID := macroLink.mesolinks[i]
+			downstreamMesolinkID := macroLink.mesolinks[i+1]
+
+			upstreamMesolink, ok := mesoNet.links[upstreamMesolinkID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Upstream mesoscopic link %d not found for macroscopic link %d", upstreamMesolinkID, macroLink.ID)
+			}
+			downstreamMesolink, ok := mesoNet.links[downstreamMesolinkID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Downstream mesoscopic link %d not found for macroscopic link %d", downstreamMesolinkID, macroLink.ID)
+			}
+
+			upstreamLeftLaneOriginal := upstreamMesolink.lanesChange[0]
+			downstreamLeftLaneOriginal := downstreamMesolink.lanesChange[0]
+
+			minLeftLane := min(upstreamLeftLaneOriginal, downstreamLeftLaneOriginal)
+			upstreamLaneStart := upstreamLeftLaneOriginal - minLeftLane
+			downstreamLaneStart := downstreamLeftLaneOriginal - minLeftLane
+
+			numberOfConnections := min(upstreamMesolink.lanesNum-upstreamLaneStart, downstreamMesolink.lanesNum-downstreamLaneStart)
+			for j := 0; j < numberOfConnections; j++ {
+				upstreamLane := upstreamLaneStart + j
+				downstreamLane := downstreamLaneStart + j
+				upstreamMicroNodeID := upstreamMesolink.microNodesPerLane[upstreamLane][len(upstreamMesolink.microNodesPerLane[upstreamLane])-1]
+				downstreamMicroNodeID := downstreamMesolink.microNodesPerLane[downstreamLane][0]
+				upstreamMesolink.microNodesPerLane[upstreamLane][len(upstreamMesolink.microNodesPerLane[upstreamLane])-1] = downstreamMicroNodeID
+				delete(microscopic.nodes, upstreamMicroNodeID)
+			}
+			if bike {
+				upstreamMicroNodeID := upstreamMesolink.microNodesBikeLane[len(upstreamMesolink.microNodesBikeLane)-1]
+				downstreamMicroNodeID := downstreamMesolink.microNodesBikeLane[0]
+				upstreamMesolink.microNodesBikeLane[len(upstreamMesolink.microNodesBikeLane)-1] = downstreamMicroNodeID
+				delete(microscopic.nodes, upstreamMicroNodeID)
+			}
+			if walk {
+				upstreamMicroNodeID := upstreamMesolink.microNodesWalkLane[len(upstreamMesolink.microNodesWalkLane)-1]
+				downstreamMicroNodeID := downstreamMesolink.microNodesWalkLane[0]
+				upstreamMesolink.microNodesWalkLane[len(upstreamMesolink.microNodesWalkLane)-1] = downstreamMicroNodeID
+				delete(microscopic.nodes, upstreamMicroNodeID)
+			}
+		}
+
+		fmt.Println(lastNodeID, len(macroLink.mesolinks)-1)
+		// @todo: Create microscopic links (a.k.a. cells in terms of cellular automata)
 	}
 
 	microscopic.maxNodeID = lastNodeID
