@@ -205,7 +205,7 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	// @todo: Consider optional auto-generation
 	/* */
 
-	/* Build meso/micro */
+	/* Build meso */
 	mesoscopic.generateLinks(net)
 	mesoscopic.connectLinks(net)
 	mesoscopic.updateBoundaryType(net)

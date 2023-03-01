@@ -7,6 +7,7 @@ import (
 
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geo"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -355,8 +356,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 			}
 		}
 
-		fmt.Println(lastNodeID, len(macroLink.mesolinks)-1)
-		// @todo: Create microscopic links (a.k.a. cells in terms of cellular automata)
+		// Create microscopic links (a.k.a. cells in terms of cellular automata)
 		for _, mesoLinkID := range macroLink.mesolinks {
 			mesoLink, ok := mesoNet.links[mesoLinkID]
 			if !ok {
@@ -513,10 +513,25 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 
 	microscopic.maxNodeID = lastNodeID
 	microscopic.maxLinkID = lastLinkID
+
+	err := microscopic.connectLinks(macroNet, mesoNet)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't connect microscopic links for movement layer")
+	}
+
 	if verbose {
 		fmt.Printf("Done in %v\n", time.Since(st))
 	}
 	return &microscopic, nil
+}
+
+// connectLinks connects microscopic links via movements layer from both macroscopic and mesoscopic graphs
+//
+// generated connections between links are links too
+//
+func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic) error {
+	// @TODO
+	return nil
 }
 
 // prepareBikeWalkAgents returns a list of agent types that should be used for the link
