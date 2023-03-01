@@ -3,8 +3,11 @@ package osm2ch
 import "github.com/paulmach/orb"
 
 type NetworkNodeMicroscopic struct {
+	incomingLinks  []NetworkLinkID
+	outcomingLinks []NetworkLinkID
+
 	geom          orb.Point
-	geomEuclidead orb.Point
+	geomEuclidean orb.Point
 
 	ID NetworkNodeID
 

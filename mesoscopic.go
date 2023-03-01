@@ -233,7 +233,7 @@ func (mesoNet *NetworkMesoscopic) createExpandedNodes(macroNodes map[NetworkNode
 				mesoNet.expandedMesoNodes[node.id] += 1
 				mesoNode := NewMesoNode(node.id, expandedNodesNum)
 				mesoNode.geom = node.geom.copy()
-				mesoNode.geomEuclidead = node.geomEuclidead.copy()
+				mesoNode.geomEuclidean = node.geomEuclidean.copy()
 				mesoNode.macro_node_id = node.id
 				node.centroid_meso_node_id = mesoNode.id
 				mesoNet.nodes[mesoNode.id] = mesoNode

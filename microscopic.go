@@ -29,6 +29,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 	fmt.Println()
 
 	lastNodeID := microscopic.maxNodeID
+	lastLinkID := microscopic.maxLinkID
 
 	// Iterate over macroscopic links
 	for _, macroLink := range macroNet.links {
@@ -192,7 +193,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 					microNode := NetworkNodeMicroscopic{
 						ID:                         lastNodeID,
 						geom:                       microNodeGeom,
-						geomEuclidead:              microNodesGeometriesEuclidean[i][j],
+						geomEuclidean:              microNodesGeometriesEuclidean[i][j],
 						mesoLinkID:                 mesoLink.ID,
 						laneID:                     i + 1,
 						isLinkUpstreamTargetNode:   false,
@@ -209,7 +210,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 					microNode := NetworkNodeMicroscopic{
 						ID:                         lastNodeID,
 						geom:                       microNodeGeom,
-						geomEuclidead:              bikeMicroNodesGeometriesEuclidean[j],
+						geomEuclidean:              bikeMicroNodesGeometriesEuclidean[j],
 						mesoLinkID:                 mesoLink.ID,
 						laneID:                     -1,
 						isLinkUpstreamTargetNode:   false,
@@ -225,7 +226,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 					microNode := NetworkNodeMicroscopic{
 						ID:                         lastNodeID,
 						geom:                       microNodeGeom,
-						geomEuclidead:              walkMicroNodesGeometriesEuclidean[j],
+						geomEuclidean:              walkMicroNodesGeometriesEuclidean[j],
 						mesoLinkID:                 mesoLink.ID,
 						laneID:                     -2,
 						isLinkUpstreamTargetNode:   false,
@@ -356,6 +357,56 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 
 		fmt.Println(lastNodeID, len(macroLink.mesolinks)-1)
 		// @todo: Create microscopic links (a.k.a. cells in terms of cellular automata)
+		for _, mesoLinkID := range macroLink.mesolinks {
+			mesoLink, ok := mesoNet.links[mesoLinkID]
+			if !ok {
+				return nil, fmt.Errorf("genMicroscopicNetwork(): Mesoscopic link %d not found for macroscopic link %d", mesoLinkID, macroLink.ID)
+			}
+			for i := 0; i < mesoLink.lanesNum; i++ {
+				// Forward
+				for j := 0; j < len(mesoLink.microNodesPerLane[i])-1; j++ {
+					sourceNodeID := mesoLink.microNodesPerLane[i][j]
+					targetNodeID := mesoLink.microNodesPerLane[i][j+1]
+
+					sourceNode, ok := microscopic.nodes[sourceNodeID]
+					if !ok {
+						return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d not found for mesoscopic link %d", sourceNodeID, mesoLinkID)
+					}
+					targetNode, ok := microscopic.nodes[targetNodeID]
+					if !ok {
+						return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d not found for mesoscopic link %d", targetNodeID, mesoLinkID)
+					}
+					microLink := NetworkLinkMicroscopic{
+						ID:                lastLinkID,
+						sourceNodeID:      sourceNodeID,
+						targetNodeID:      targetNodeID,
+						geom:              orb.LineString{sourceNode.geom, targetNode.geom},
+						geomEuclidean:     orb.LineString{sourceNode.geomEuclidean, targetNode.geomEuclidean},
+						mesoLinkID:        mesoLinkID,
+						microLinkType:     LINK_FORWARD,
+						allowedAgentTypes: make([]AgentType, len(multiModalAgentTypes)),
+					}
+					copy(microLink.allowedAgentTypes, multiModalAgentTypes)
+					microscopic.links[lastLinkID] = &microLink
+					lastLinkID++
+					sourceNode.outcomingLinks = append(sourceNode.outcomingLinks, microLink.ID)
+					targetNode.incomingLinks = append(targetNode.incomingLinks, microLink.ID)
+				}
+				// Lane change
+				if i < mesoLink.lanesNum-2 {
+					// @TODO
+				}
+				if i >= 1 {
+					// @TODO
+				}
+			}
+			if bike {
+				// @TODO
+			}
+			if walk {
+				// @TODO
+			}
+		}
 	}
 
 	microscopic.maxNodeID = lastNodeID
