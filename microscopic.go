@@ -462,6 +462,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 	}
 
 	microscopic.maxNodeID = lastNodeID
+	microscopic.maxLinkID = lastLinkID
 	if verbose {
 		fmt.Printf("Done in %v\n", time.Since(st))
 	}
