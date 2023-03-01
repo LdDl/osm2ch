@@ -398,11 +398,11 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						targetNodeID := mesoLink.microNodesPerLane[i+1][j+1]
 						sourceNode, ok := microscopic.nodes[sourceNodeID]
 						if !ok {
-							return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d not found for mesoscopic link %d", sourceNodeID, mesoLinkID)
+							return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d for then left turn not found for mesoscopic link %d", sourceNodeID, mesoLinkID)
 						}
 						targetNode, ok := microscopic.nodes[targetNodeID]
 						if !ok {
-							return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d not found for mesoscopic link %d", targetNodeID, mesoLinkID)
+							return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d for then left turn not found for mesoscopic link %d", targetNodeID, mesoLinkID)
 						}
 						microLink := NetworkLinkMicroscopic{
 							ID:                lastLinkID,
@@ -428,11 +428,11 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						targetNodeID := mesoLink.microNodesPerLane[i-1][j+1]
 						sourceNode, ok := microscopic.nodes[sourceNodeID]
 						if !ok {
-							return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d not found for mesoscopic link %d", sourceNodeID, mesoLinkID)
+							return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d for then right turn not found for mesoscopic link %d", sourceNodeID, mesoLinkID)
 						}
 						targetNode, ok := microscopic.nodes[targetNodeID]
 						if !ok {
-							return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d not found for mesoscopic link %d", targetNodeID, mesoLinkID)
+							return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d for the right turn not found for mesoscopic link %d", targetNodeID, mesoLinkID)
 						}
 						microLink := NetworkLinkMicroscopic{
 							ID:                lastLinkID,
@@ -458,11 +458,11 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 					targetNodeID := mesoLink.microNodesBikeLane[i+1]
 					sourceNode, ok := microscopic.nodes[sourceNodeID]
 					if !ok {
-						return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d not found for mesoscopic link %d", sourceNodeID, mesoLinkID)
+						return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d not found for BIKE mesoscopic link %d", sourceNodeID, mesoLinkID)
 					}
 					targetNode, ok := microscopic.nodes[targetNodeID]
 					if !ok {
-						return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d not found for mesoscopic link %d", targetNodeID, mesoLinkID)
+						return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d not found for BIKE mesoscopic link %d", targetNodeID, mesoLinkID)
 					}
 					microLink := NetworkLinkMicroscopic{
 						ID:                lastLinkID,
@@ -486,11 +486,11 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 					targetNodeID := mesoLink.microNodesWalkLane[i+1]
 					sourceNode, ok := microscopic.nodes[sourceNodeID]
 					if !ok {
-						return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d not found for mesoscopic link %d", sourceNodeID, mesoLinkID)
+						return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d not found for WALK mesoscopic link %d", sourceNodeID, mesoLinkID)
 					}
 					targetNode, ok := microscopic.nodes[targetNodeID]
 					if !ok {
-						return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d not found for mesoscopic link %d", targetNodeID, mesoLinkID)
+						return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d not found for WALK mesoscopic link %d", targetNodeID, mesoLinkID)
 					}
 					microLink := NetworkLinkMicroscopic{
 						ID:                lastLinkID,
