@@ -481,7 +481,32 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				}
 			}
 			if walk {
-				// @TODO
+				for i := 0; i < len(mesoLink.microNodesWalkLane)-1; i++ {
+					sourceNodeID := mesoLink.microNodesWalkLane[i]
+					targetNodeID := mesoLink.microNodesWalkLane[i+1]
+					sourceNode, ok := microscopic.nodes[sourceNodeID]
+					if !ok {
+						return nil, fmt.Errorf("genMicroscopicNetwork(): Source microscopic node %d not found for mesoscopic link %d", sourceNodeID, mesoLinkID)
+					}
+					targetNode, ok := microscopic.nodes[targetNodeID]
+					if !ok {
+						return nil, fmt.Errorf("genMicroscopicNetwork(): Target microscopic node %d not found for mesoscopic link %d", targetNodeID, mesoLinkID)
+					}
+					microLink := NetworkLinkMicroscopic{
+						ID:                lastLinkID,
+						sourceNodeID:      sourceNodeID,
+						targetNodeID:      targetNodeID,
+						geom:              orb.LineString{sourceNode.geom, targetNode.geom},
+						geomEuclidean:     orb.LineString{sourceNode.geomEuclidean, targetNode.geomEuclidean},
+						mesoLinkID:        mesoLinkID,
+						microLinkType:     LINK_FORWARD,
+						allowedAgentTypes: []AgentType{AGENT_WALK},
+					}
+					microscopic.links[lastLinkID] = &microLink
+					lastLinkID++
+					sourceNode.outcomingLinks = append(sourceNode.outcomingLinks, microLink.ID)
+					targetNode.incomingLinks = append(targetNode.incomingLinks, microLink.ID)
+				}
 			}
 		}
 	}
