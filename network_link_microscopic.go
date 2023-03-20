@@ -26,6 +26,7 @@ type NetworkLinkMicroscopic struct {
 	allowedAgentTypes     []AgentType
 	firstMovement         bool
 	movementCompositeType MovementCompositeType // Inherited from movement of parent mesoscopic link (if firstMovement = true)
-	controlType           ControlType           // Inherited from mesoscipoc link
+	controlType           ControlType           // Inherited from mesoscopic link
 	laneID                int                   // Inherited from source node
+	isFirstMovement       bool                  // In the link is of movement type and it is the first microscopic link of the parent mesoscopic link
 }

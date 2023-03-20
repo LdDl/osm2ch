@@ -177,7 +177,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 
 			// Prepare microscopic nodes for each lane of mesoscopic link
 			for i := 0; i < mesoLink.lanesNum; i++ {
-				laneNodes := []NetworkNodeID{}
+				laneNodesIDs := []NetworkNodeID{}
 				for j, microNodeGeom := range microNodesGeometries[i] {
 					microNode := NetworkNodeMicroscopic{
 						ID:                         lastNodeID,
@@ -188,11 +188,11 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						isLinkUpstreamTargetNode:   false,
 						isLinkDownstreamTargetNode: false,
 					}
-					laneNodes = append(laneNodes, microNode.ID)
+					laneNodesIDs = append(laneNodesIDs, microNode.ID)
 					microscopic.nodes[microNode.ID] = &microNode
 					lastNodeID++
 				}
-				mesoLink.microNodesPerLane = append(mesoLink.microNodesPerLane, laneNodes)
+				mesoLink.microNodesPerLane = append(mesoLink.microNodesPerLane, laneNodesIDs)
 			}
 			if bike {
 				for j, microNodeGeom := range bikeMicroNodesGeometries {
@@ -372,6 +372,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						mesoLinkID:        mesoLinkID,
 						microLinkType:     LINK_FORWARD,
 						allowedAgentTypes: make([]AgentType, len(multiModalAgentTypes)),
+						isFirstMovement:   false,
 					}
 					copy(microLink.allowedAgentTypes, multiModalAgentTypes)
 					microscopic.links[lastLinkID] = &microLink
@@ -401,6 +402,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 							mesoLinkID:        mesoLinkID,
 							microLinkType:     LINK_LANE_CHANGE,
 							allowedAgentTypes: make([]AgentType, len(multiModalAgentTypes)),
+							isFirstMovement:   false,
 						}
 						copy(microLink.allowedAgentTypes, multiModalAgentTypes)
 						microscopic.links[lastLinkID] = &microLink
@@ -431,6 +433,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 							mesoLinkID:        mesoLinkID,
 							microLinkType:     LINK_LANE_CHANGE,
 							allowedAgentTypes: make([]AgentType, len(multiModalAgentTypes)),
+							isFirstMovement:   false,
 						}
 						copy(microLink.allowedAgentTypes, multiModalAgentTypes)
 						microscopic.links[lastLinkID] = &microLink
@@ -461,6 +464,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						mesoLinkID:        mesoLinkID,
 						microLinkType:     LINK_FORWARD,
 						allowedAgentTypes: []AgentType{AGENT_BIKE},
+						isFirstMovement:   false,
 					}
 					microscopic.links[lastLinkID] = &microLink
 					lastLinkID++
@@ -489,6 +493,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						mesoLinkID:        mesoLinkID,
 						microLinkType:     LINK_FORWARD,
 						allowedAgentTypes: []AgentType{AGENT_WALK},
+						isFirstMovement:   false,
 					}
 					microscopic.links[lastLinkID] = &microLink
 					lastLinkID++
@@ -502,6 +507,13 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 	microscopic.maxNodeID = lastNodeID
 	microscopic.maxLinkID = lastLinkID
 
+	err := microscopic.connectLinks(mesoNet)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't connect microscopic links for movement layer")
+	}
+
+	// @TODO: clean up diwnastream and upstream targets
+
 	// fmt.Println("id;source;target;geom")
 	// for _, link := range microscopic.links {
 	// 	fmt.Printf("%d;%d;%d;%s\n", link.ID, link.sourceNodeID, link.targetNodeID, wkt.MarshalString(link.geom))
@@ -510,10 +522,6 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 	// for _, node := range microscopic.nodes {
 	// 	fmt.Printf("%d;%d;%s\n", node.ID, node.laneID, wkt.MarshalString(node.geom))
 	// }
-	err := microscopic.connectLinks(macroNet, mesoNet)
-	if err != nil {
-		return nil, errors.Wrap(err, "Can't connect microscopic links for movement layer")
-	}
 
 	if verbose {
 		fmt.Printf("Done in %v\n", time.Since(st))
@@ -525,7 +533,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 //
 // generated connections between links are links too
 //
-func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic) error {
+func (microNet *NetworkMicroscopic) connectLinks(mesoNet *NetworkMesoscopic) error {
 	lastNodeID := microNet.maxNodeID
 	lastLinkID := microNet.maxLinkID
 
@@ -563,12 +571,95 @@ func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, m
 					return fmt.Errorf("connectLinks(): Outcoming microscopic node %d not found for mesoscopic movement link %d on lane :%d", endMicroNodeID, mesoLink.ID, i)
 				}
 				laneGeom := orb.LineString{startMicroNode.geom, endMicroNode.geom}
-				laneGeomEuclidean := orb.LineString{startMicroNode.geomEuclidean, endMicroNode.geomEuclidean}
+				laneLength := geo.LengthHaversign(laneGeom)
 
-				_ = laneGeom
-				_ = laneGeomEuclidean
+				// Calculate number of cell which fit into link
+				// If cell length > link length then use only one cell
+				cellsNum := math.Max(1.0, math.Round(laneLength/cellLength))
+				laneNodes := []orb.Point{}
+				laneNodesEuclidean := []orb.Point{}
+				for j := 1; j < int(cellsNum); j++ {
+					fraction := float64(j) / float64(cellsNum)
+					distance := mesoLink.lengthMeters * fraction
+					point, _ := geo.PointAtDistanceAlongLine(laneGeom, distance)
+					laneNodes = append(laneNodes, point)
+					laneNodesEuclidean = append(laneNodesEuclidean, pointToEuclidean(point))
+				}
 
-				// @todo
+				// Prepare movement lanes
+				laneNodesIDs := []NetworkNodeID{}
+				lastMicroNodeID := startMicroNodeID // Track last node to connect it with next one
+				firstMovement := true
+				for geomIdx, nodeGeom := range laneNodes {
+					// Create new microscopic node
+					microNode := NetworkNodeMicroscopic{
+						ID:                         lastNodeID,
+						geom:                       nodeGeom,
+						geomEuclidean:              laneNodesEuclidean[geomIdx],
+						mesoLinkID:                 mesoLink.ID,
+						laneID:                     i + 1,
+						isLinkUpstreamTargetNode:   false,
+						isLinkDownstreamTargetNode: false,
+					}
+					laneNodesIDs = append(laneNodesIDs, microNode.ID)
+					microNet.nodes[microNode.ID] = &microNode
+					lastNodeID++
+
+					// Create new miscroscopic link
+					lastMicroNode, ok := microNet.nodes[lastMicroNodeID]
+					if !ok {
+						return fmt.Errorf("connectLinks(): Microscopic node %d not found for mesoscopic movement link %d on lane :%d", lastMicroNodeID, mesoLink.ID, i)
+					}
+					geom := orb.LineString{lastMicroNode.geom, microNode.geom}
+					microLink := NetworkLinkMicroscopic{
+						ID:              lastLinkID,
+						sourceNodeID:    lastMicroNodeID,
+						targetNodeID:    microNode.ID,
+						geom:            geom,
+						geomEuclidean:   orb.LineString{lastMicroNode.geomEuclidean, microNode.geomEuclidean},
+						mesoLinkID:      mesoLink.ID,
+						microLinkType:   LINK_FORWARD,
+						isFirstMovement: false,
+					}
+					if firstMovement {
+						microLink.isFirstMovement = true
+						firstMovement = false
+					}
+					microNet.links[microLink.ID] = &microLink
+					lastLinkID++
+					lastMicroNode.outcomingLinks = append(lastMicroNode.outcomingLinks, microLink.ID)
+					microNode.incomingLinks = append(microNode.incomingLinks, microLink.ID)
+
+					// Go to next node
+					lastMicroNodeID = microNode.ID
+				}
+
+				// Prepare very last microscopic link for each lane
+				lastMicroNode, ok := microNet.nodes[lastMicroNodeID]
+				if !ok {
+					return fmt.Errorf("connectLinks(): Microscopic node %d not found for last mesoscopic movement link %d on lane :%d", lastMicroNodeID, mesoLink.ID, i)
+				}
+				geom := orb.LineString{lastMicroNode.geom, endMicroNode.geom}
+				microLink := NetworkLinkMicroscopic{
+					ID:              lastLinkID,
+					sourceNodeID:    lastMicroNodeID,
+					targetNodeID:    endMicroNodeID,
+					geom:            geom,
+					geomEuclidean:   orb.LineString{lastMicroNode.geomEuclidean, endMicroNode.geomEuclidean},
+					mesoLinkID:      mesoLink.ID,
+					microLinkType:   LINK_FORWARD,
+					isFirstMovement: false,
+				}
+				if firstMovement {
+					microLink.isFirstMovement = true
+				}
+				microNet.links[microLink.ID] = &microLink
+				lastLinkID++
+				lastMicroNode.outcomingLinks = append(lastMicroNode.outcomingLinks, microLink.ID)
+				endMicroNode.incomingLinks = append(endMicroNode.incomingLinks, microLink.ID)
+
+				// Add movement lane to mesoscopic link
+				mesoLink.microNodesPerLane = append(mesoLink.microNodesPerLane, laneNodesIDs)
 			}
 		}
 	}
