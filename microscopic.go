@@ -79,9 +79,9 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				// Otherwise evaluate offset for geometry
 				if laneOffset < -1e-2 || laneOffset > 1e-2 {
 					laneGeomEuclidean := offsetCurve(mesoLink.geomEuclidean, -laneOffset) // Use "-" sign to make offset to the right side
-					if laneOffset > 0 {
-						laneGeomEuclidean.Reverse()
-					}
+					// if laneOffset > 0 {
+					// laneGeomEuclidean.Reverse()
+					// }
 					laneGeometriesEuclidean = append(laneGeometriesEuclidean, laneGeomEuclidean)
 					laneGeometries = append(laneGeometries, lineToSpherical(laneGeomEuclidean))
 				} else {
@@ -94,9 +94,9 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				bikeLaneOffset := laneOffset + bikeLaneWidth
 				if bikeLaneOffset < -1e-2 || bikeLaneOffset > 1e-2 {
 					bikeGeometryEuclidean = offsetCurve(mesoLink.geomEuclidean, -bikeLaneOffset)
-					if bikeLaneOffset > 0 {
-						bikeGeometryEuclidean.Reverse()
-					}
+					// if bikeLaneOffset > 0 {
+					// 	bikeGeometryEuclidean.Reverse()
+					// }
 					bikeGeometry = lineToSpherical(bikeGeometryEuclidean)
 				} else {
 					bikeGeometryEuclidean = mesoLink.geomEuclidean.Clone()
@@ -107,9 +107,9 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				walkLaneOffset := laneOffset + walkLaneWidth
 				if walkLaneOffset < -1e-2 || walkLaneOffset > 1e-2 {
 					walkGeometryEuclidean = offsetCurve(mesoLink.geomEuclidean, -walkLaneOffset)
-					if walkLaneOffset > 0 {
-						walkGeometryEuclidean.Reverse()
-					}
+					// if walkLaneOffset > 0 {
+					// 	walkGeometryEuclidean.Reverse()
+					// }
 					walkGeometry = lineToSpherical(walkGeometryEuclidean)
 				} else {
 					walkGeometryEuclidean = mesoLink.geomEuclidean.Clone()
@@ -121,9 +121,9 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				walkLaneOffset := laneOffset + walkLaneWidth
 				if bikeLaneOffset < -1e-2 || bikeLaneOffset > 1e-2 {
 					bikeGeometryEuclidean = offsetCurve(mesoLink.geomEuclidean, -bikeLaneOffset)
-					if bikeLaneOffset > 0 {
-						bikeGeometryEuclidean.Reverse()
-					}
+					// if bikeLaneOffset > 0 {
+					// 	bikeGeometryEuclidean.Reverse()
+					// }
 					bikeGeometry = lineToSpherical(bikeGeometryEuclidean)
 				} else {
 					bikeGeometryEuclidean = mesoLink.geomEuclidean.Clone()
@@ -131,9 +131,9 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				}
 				if walkLaneOffset < -1e-2 || walkLaneOffset > 1e-2 {
 					walkGeometryEuclidean = offsetCurve(mesoLink.geomEuclidean, -walkLaneOffset)
-					if walkLaneOffset > 0 {
-						walkGeometryEuclidean.Reverse()
-					}
+					// if walkLaneOffset > 0 {
+					// 	walkGeometryEuclidean.Reverse()
+					// }
 					walkGeometry = lineToSpherical(walkGeometryEuclidean)
 				} else {
 					walkGeometryEuclidean = mesoLink.geomEuclidean.Clone()
@@ -392,7 +392,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 					targetNode.incomingLinks = append(targetNode.incomingLinks, microLink.ID)
 				}
 				// Lane change (left)
-				if i < mesoLink.lanesNum-2 {
+				if i <= mesoLink.lanesNum-2 {
 					for j := 0; j < len(mesoLink.microNodesPerLane[i])-1; j++ {
 						sourceNodeID := mesoLink.microNodesPerLane[i][j]
 						targetNodeID := mesoLink.microNodesPerLane[i+1][j+1]
@@ -514,6 +514,14 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 	microscopic.maxNodeID = lastNodeID
 	microscopic.maxLinkID = lastLinkID
 
+	// fmt.Println("id;source;target;geom")
+	// for _, link := range microscopic.links {
+	// 	fmt.Printf("%d;%d;%d;%s\n", link.ID, link.sourceNodeID, link.targetNodeID, wkt.MarshalString(link.geom))
+	// }
+	// fmt.Println("id;geom")
+	// for _, node := range microscopic.nodes {
+	// 	fmt.Printf("%d;%d;%s\n", node.ID, node.laneID, wkt.MarshalString(node.geom))
+	// }
 	err := microscopic.connectLinks(macroNet, mesoNet)
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't connect microscopic links for movement layer")
