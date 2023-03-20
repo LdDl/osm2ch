@@ -538,19 +538,55 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 // generated connections between links are links too
 //
 func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic) error {
+	lastNodeID := microNet.maxNodeID
+	lastLinkID := microNet.maxLinkID
+
 	// Iterate over all mesoscopic links and work with ones that contain movements
 	for _, mesoLink := range mesoNet.links {
 		// MovementID is not default, therefore this mesoscopic link is movement (from macroscopic node)
 		if mesoLink.movementID > -1 {
 			if mesoLink.movementLinkIncome < 0 || mesoLink.movementLinkOutcome < 0 {
-				return fmt.Errorf("connectLinks(): Movement link %d has no income or outcome and movement is needed", mesoLink.ID)
+				return fmt.Errorf("connectLinks(): Mesoscopic movement link %d has no income or outcome and movement is needed", mesoLink.ID)
 			}
-			if mesoLink.movementLaneStart < 0 || mesoLink.movementLaneEnd < 0 {
-				return fmt.Errorf("connectLinks(): Movement link %d has no start lane index or end lane index and movement is needed", mesoLink.ID)
+			if mesoLink.movementIncomeLaneStart < 0 || mesoLink.movementOutcomeLaneStart < 0 {
+				return fmt.Errorf("connectLinks(): Mesoscopic movement link %d has no start lane index or end lane index and movement is needed", mesoLink.ID)
 			}
-			// @TODO
+			incomingMesoLink, ok := mesoNet.links[mesoLink.movementLinkIncome]
+			if !ok {
+				return fmt.Errorf("connectLinks(): Incoming mesoscopic link %d not found for mesoscopic movement link %d", mesoLink.movementLinkIncome, mesoLink.ID)
+			}
+			outcomingMesoLink, ok := mesoNet.links[mesoLink.movementLinkOutcome]
+			if !ok {
+				return fmt.Errorf("connectLinks(): Outcoming mesoscopic link %d not found for mesoscopic movement link %d", mesoLink.movementLinkOutcome, mesoLink.ID)
+			}
+			for i := 0; i < mesoLink.lanesNum; i++ {
+				incomingMicroNodes := incomingMesoLink.microNodesPerLane[mesoLink.movementIncomeLaneStart+i]
+				outcomingMicroNodes := outcomingMesoLink.microNodesPerLane[mesoLink.movementOutcomeLaneStart+i]
+
+				startMicroNodeID := incomingMicroNodes[len(incomingMicroNodes)-1]
+				endMicroNodeID := outcomingMicroNodes[0]
+
+				startMicroNode, ok := microNet.nodes[startMicroNodeID]
+				if !ok {
+					return fmt.Errorf("connectLinks(): Incoming microscopic node %d not found for mesoscopic movement link %d on lane :%d", startMicroNodeID, mesoLink.ID, i)
+				}
+				endMicroNode, ok := microNet.nodes[endMicroNodeID]
+				if !ok {
+					return fmt.Errorf("connectLinks(): Outcoming microscopic node %d not found for mesoscopic movement link %d on lane :%d", endMicroNodeID, mesoLink.ID, i)
+				}
+				laneGeom := orb.LineString{startMicroNode.geom, endMicroNode.geom}
+				laneGeomEuclidean := orb.LineString{startMicroNode.geomEuclidean, endMicroNode.geomEuclidean}
+
+				_ = laneGeom
+				_ = laneGeomEuclidean
+
+				// @todo
+			}
 		}
 	}
+
+	microNet.maxNodeID = lastNodeID
+	microNet.maxLinkID = lastLinkID
 	return nil
 }
 

@@ -19,12 +19,12 @@ type NetworkLinkMesoscopic struct {
 	macroNodeID NetworkNodeID
 
 	/* Movement information */
-	movementID            MovementID
-	movementCompositeType MovementCompositeType // Inherited from movement
-	movementLinkIncome    NetworkLinkID
-	movementLinkOutcome   NetworkLinkID
-	movementLaneStart     int
-	movementLaneEnd       int
+	movementID               MovementID
+	movementCompositeType    MovementCompositeType // Inherited from movement
+	movementLinkIncome       NetworkLinkID
+	movementLinkOutcome      NetworkLinkID
+	movementIncomeLaneStart  int
+	movementOutcomeLaneStart int
 
 	controlType       ControlType // Inherited from macroscopic node
 	linkType          LinkType    // Inherited either from macroscopic link or from first incoming incident edge in macroscopic node
