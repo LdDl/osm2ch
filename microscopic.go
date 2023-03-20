@@ -538,7 +538,19 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 // generated connections between links are links too
 //
 func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic) error {
-	// @TODO
+	// Iterate over all mesoscopic links and work with ones that contain movements
+	for _, mesoLink := range mesoNet.links {
+		// MovementID is not default, therefore this mesoscopic link is movement (from macroscopic node)
+		if mesoLink.movementID > -1 {
+			if mesoLink.movementLinkIncome < 0 || mesoLink.movementLinkOutcome < 0 {
+				return fmt.Errorf("connectLinks(): Movement link %d has no income or outcome and movement is needed", mesoLink.ID)
+			}
+			if mesoLink.movementLaneStart < 0 || mesoLink.movementLaneEnd < 0 {
+				return fmt.Errorf("connectLinks(): Movement link %d has no start lane index or end lane index and movement is needed", mesoLink.ID)
+			}
+			// @TODO
+		}
+	}
 	return nil
 }
 

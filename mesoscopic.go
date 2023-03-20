@@ -331,6 +331,10 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 				lengthMeters:  geo.LengthHaversign(link.geomOffsetCut[segmentIdx]),
 				// Default movement
 				movementCompositeType: MOVEMENT_NONE,
+				movementLinkIncome:    NetworkLinkID(-1),
+				movementLinkOutcome:   NetworkLinkID(-1),
+				movementLaneStart:     -1,
+				movementLaneEnd:       -1,
 			}
 
 			link.mesolinks = append(link.mesolinks, mesoLink.ID)
@@ -463,6 +467,10 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 					lengthMeters:  geo.LengthHaversign(orb.LineString{incomingMesoLink.geom[len(incomingMesoLink.geom)-1], outcomingMesoLink.geom[0]}),
 					// Inherit movement properties
 					movementCompositeType: movement.movementCompositeType,
+					movementLinkIncome:    incomingMesoLinkID,
+					movementLinkOutcome:   outcomingMesoLinkID,
+					movementLaneStart:     incomeLaneStart,
+					movementLaneEnd:       outcomeLaneStart,
 				}
 				mesoNet.links[mesoLink.ID] = &mesoLink
 				lastMesoLinkID += 1
