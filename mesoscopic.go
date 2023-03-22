@@ -479,7 +479,25 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 				mesoNet.nodes[mesoLink.sourceNodeID].outcomingLinks = append(mesoNet.nodes[mesoLink.sourceNodeID].outcomingLinks, mesoLink.ID)
 				mesoNet.nodes[mesoLink.targetNodeID].incomingLinks = append(mesoNet.nodes[mesoLink.targetNodeID].incomingLinks, mesoLink.ID)
 			} else {
-				panic("Not handled yet")
+
+				if incomingMacroLink.downstreamIsTarget && !outcomingMacroLink.upstreamIsTarget {
+					// remove incoming micro nodes and links of outcomingMesoLink, then connect to incomingMesoLink
+					incomingMesoLinkTargetNodeID := incomingMesoLink.targetNodeID
+					outcomingMesoLinkSourceNodeID := outcomingMesoLink.sourceNodeID
+
+					outcomingMesoLink.sourceNodeID = incomingMesoLinkTargetNodeID
+
+					outcomingMesoLink.geom = append(orb.LineString{incomingMesoLink.geom[len(incomingMesoLink.geom)-1]}, outcomingMesoLink.geom[1:]...)
+					outcomingMesoLink.geomEuclidean = append(orb.LineString{incomingMesoLink.geomEuclidean[len(incomingMesoLink.geomEuclidean)-1]}, outcomingMesoLink.geomEuclidean[1:]...)
+
+					delete(mesoNet.nodes, outcomingMesoLinkSourceNodeID)
+
+					//@todo process micro?
+				} else if !incomingMacroLink.downstreamIsTarget && outcomingMacroLink.upstreamIsTarget {
+					//remove outgoing micro nodes and links of incomingMesoLink, then connect to outcomingMesoLink
+
+					// @todo
+				}
 			}
 		}
 	}
