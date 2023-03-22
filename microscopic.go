@@ -606,16 +606,6 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 		}
 		link.movementCompositeType = mesoLink.movementCompositeType
 	}
-	// @TODO: clean up diwnastream and upstream targets
-
-	// fmt.Println("id;source;target;geom")
-	// for _, link := range microscopic.links {
-	// 	fmt.Printf("%d;%d;%d;%s\n", link.ID, link.sourceNodeID, link.targetNodeID, wkt.MarshalString(link.geom))
-	// }
-	// fmt.Println("id;geom")
-	// for _, node := range microscopic.nodes {
-	// 	fmt.Printf("%d;%d;%s\n", node.ID, node.laneID, wkt.MarshalString(node.geom))
-	// }
 
 	if verbose {
 		fmt.Printf("Done in %v\n", time.Since(st))

@@ -491,7 +491,7 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 
 					delete(mesoNet.nodes, outcomingMesoLinkSourceNodeID)
 
-					//@todo process micro?
+					//@todo process micro? @CRITICAL
 				} else if !incomingMacroLink.downstreamIsTarget && outcomingMacroLink.upstreamIsTarget {
 					//remove outgoing micro nodes and links of incomingMesoLink, then connect to outcomingMesoLink
 					incomingMesoLinkTargetNodeID := incomingMesoLink.targetNodeID
@@ -503,7 +503,7 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 
 					delete(mesoNet.nodes, incomingMesoLinkTargetNodeID)
 
-					//@todo process micro?
+					//@todo process micro? @CRITICAL
 				}
 			}
 		}
