@@ -6,7 +6,7 @@ import (
 
 func TestParser(t *testing.T) {
 	parser := NewParser(
-		"/home/dimitrii/go_work/its/its_cellular_automata/example_habarovsk/habarovsk.osm",
+		"./sample.osm",
 		WithPreparePOI(false),
 		WithStrictMode(false),
 	)
