@@ -47,10 +47,9 @@ func TestParser(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	_ = netMicro
-	// err = netMicro.ExportToCSV(outFile)
-	// if err != nil {
-	// 	t.Error(err)
-	// 	return
-	// }
+	err = netMicro.ExportToCSV(outFile)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 }

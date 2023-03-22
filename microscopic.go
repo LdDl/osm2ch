@@ -187,6 +187,8 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						laneID:                     i + 1,
 						isLinkUpstreamTargetNode:   false,
 						isLinkDownstreamTargetNode: false,
+						zoneID:                     -1,
+						boundaryType:               BOUNDARY_NONE,
 					}
 					laneNodesIDs = append(laneNodesIDs, microNode.ID)
 					microscopic.nodes[microNode.ID] = &microNode
@@ -204,6 +206,8 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						laneID:                     -1,
 						isLinkUpstreamTargetNode:   false,
 						isLinkDownstreamTargetNode: false,
+						zoneID:                     -1,
+						boundaryType:               BOUNDARY_NONE,
 					}
 					microscopic.nodes[microNode.ID] = &microNode
 					mesoLink.microNodesBikeLane = append(mesoLink.microNodesBikeLane, microNode.ID)
@@ -220,6 +224,8 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 						laneID:                     -2,
 						isLinkUpstreamTargetNode:   false,
 						isLinkDownstreamTargetNode: false,
+						zoneID:                     -1,
+						boundaryType:               BOUNDARY_NONE,
 					}
 					microscopic.nodes[microNode.ID] = &microNode
 					mesoLink.microNodesWalkLane = append(mesoLink.microNodesWalkLane, microNode.ID)
@@ -239,6 +245,12 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 		if !ok {
 			return nil, fmt.Errorf("genMicroscopicNetwork(): First mesoscopic link %d not found for macroscopic link %d", firstMesoLinkID, macroLink.ID)
 		}
+		// Macroscopic source node will be needed to attach zone ID
+		macroSourceNodeID := macroLink.sourceNodeID
+		macroSourceNode, ok := macroNet.nodes[macroSourceNodeID]
+		if !ok {
+			return nil, fmt.Errorf("genMicroscopicNetwork(): Macroscopic source node %d not found for macroscopic link %d for mesoscopic link %d", macroSourceNodeID, macroLink.ID, firstMesoLinkID)
+		}
 		for _, microNodeLane := range firstMesoLink.microNodesPerLane {
 			// @todo: check size of nodes per lane slice
 			firstNodeID := microNodeLane[0]
@@ -247,6 +259,8 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for first mesoscopic link %d for macroscopic link %d", firstNodeID, firstMesoLinkID, macroLink.ID)
 			}
 			firstNode.isLinkUpstreamTargetNode = true
+			// Attach zone ID to this node node
+			firstNode.zoneID = macroSourceNode.zoneID
 		}
 		if bike {
 			// @todo: check size of microNodeLane
@@ -256,6 +270,8 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for first BIKE mesoscopic link %d for macroscopic link %d", firstNodeID, firstMesoLinkID, macroLink.ID)
 			}
 			firstNode.isLinkUpstreamTargetNode = true
+			// Attach zone ID to this node node
+			firstNode.zoneID = macroSourceNode.zoneID
 		}
 		if walk {
 			// @todo: check size of microNodeLane
@@ -265,12 +281,19 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for first WALK mesoscopic link %d for macroscopic link %d", firstNodeID, firstMesoLinkID, macroLink.ID)
 			}
 			firstNode.isLinkUpstreamTargetNode = true
+			// Attach zone ID to this node node
+			firstNode.zoneID = macroSourceNode.zoneID
 		}
 
 		lastMesoLinkID := macroLink.mesolinks[len(macroLink.mesolinks)-1]
 		lastMesoLink, ok := mesoNet.links[lastMesoLinkID]
 		if !ok {
 			return nil, fmt.Errorf("genMicroscopicNetwork(): Last mesoscopic link %d not found for macroscopic link %d", lastMesoLinkID, macroLink.ID)
+		}
+		macroTargetNodeID := macroLink.targetNodeID
+		macroTargetNode, ok := macroNet.nodes[macroTargetNodeID]
+		if !ok {
+			return nil, fmt.Errorf("genMicroscopicNetwork(): Macroscopic target node %d not found for macroscopic link %d for mesoscopic link %d", macroTargetNodeID, macroLink.ID, firstMesoLinkID)
 		}
 		for _, microNodeLane := range lastMesoLink.microNodesPerLane {
 			// @todo: check size of microNodeLane
@@ -280,6 +303,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for last mesoscopic link %d for macroscopic link %d", lastNodeID, lastMesoLinkID, macroLink.ID)
 			}
 			lastNode.isLinkDownstreamTargetNode = true
+			lastNode.zoneID = macroTargetNode.zoneID
 		}
 		if bike {
 			// @todo: check size of microNodeLane
@@ -289,6 +313,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for last BIKE mesoscopic link %d for macroscopic link %d", lastNodeID, lastMesoLinkID, macroLink.ID)
 			}
 			lastNode.isLinkDownstreamTargetNode = true
+			lastNode.zoneID = macroTargetNode.zoneID
 		}
 		if walk {
 			// @todo: check size of microNodeLane
@@ -298,6 +323,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 				return nil, fmt.Errorf("genMicroscopicNetwork(): Microscopic node %d not found for last WALK mesoscopic link %d for macroscopic link %d", lastNodeID, lastMesoLinkID, macroLink.ID)
 			}
 			lastNode.isLinkDownstreamTargetNode = true
+			lastNode.zoneID = macroTargetNode.zoneID
 		}
 
 		// Post-process microscopics nodes between two adjacent mesoscopic links
@@ -512,6 +538,11 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 		return nil, errors.Wrap(err, "Can't connect microscopic links for movement layer")
 	}
 
+	err = microscopic.updateBoundaryType(mesoNet)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't update boundary type for microscopic nodes")
+	}
+
 	// @TODO: clean up diwnastream and upstream targets
 
 	// fmt.Println("id;source;target;geom")
@@ -600,6 +631,8 @@ func (microNet *NetworkMicroscopic) connectLinks(mesoNet *NetworkMesoscopic) err
 						laneID:                     i + 1,
 						isLinkUpstreamTargetNode:   false,
 						isLinkDownstreamTargetNode: false,
+						zoneID:                     -1,
+						boundaryType:               BOUNDARY_NONE,
 					}
 					laneNodesIDs = append(laneNodesIDs, microNode.ID)
 					microNet.nodes[microNode.ID] = &microNode
@@ -694,4 +727,40 @@ func prepareBikeWalkAgents(agentTypes []AgentType) (main []AgentType, bike bool,
 		return []AgentType{AGENT_BIKE}, false, true
 	}
 	return []AgentType{AGENT_AUTO}, true, true
+}
+
+// updateBoundaryType updates boundary type for each microscopic node
+//
+// this function should be called after all incident edges for nodes are set
+//
+func (microNet *NetworkMicroscopic) updateBoundaryType(mesoNet *NetworkMesoscopic) error {
+	for _, microNode := range microNet.nodes {
+		if microNode.mesoLinkID == -1 {
+			microNode.boundaryType = BOUNDARY_NONE
+			continue
+		}
+		mesoLink, ok := mesoNet.links[microNode.mesoLinkID]
+		if !ok {
+			return fmt.Errorf("connectNodes(): Mesoscopic link %d not found for microscopic node %d", microNode.mesoLinkID, microNode.ID)
+		}
+		mesoLinkSourceNodeID := mesoLink.sourceNodeID
+		mesoLinkSourceNode, ok := mesoNet.nodes[mesoLinkSourceNodeID]
+		if !ok {
+			return fmt.Errorf("connectNodes(): Mesoscopic node %d not found for mesoscopic link %d for microscopic node %d", mesoLinkSourceNodeID, mesoLink.ID, microNode.ID)
+		}
+		if microNode.isLinkUpstreamTargetNode {
+			microNode.boundaryType = mesoLinkSourceNode.boundaryType
+		} else if microNode.isLinkDownstreamTargetNode {
+			mesoLinkTargetNodeID := mesoLink.targetNodeID
+			mesoLinkTargetNode, ok := mesoNet.nodes[mesoLinkTargetNodeID]
+			if !ok {
+				return fmt.Errorf("connectNodes(): Mesoscopic node %d not found for mesoscopic link %d for microscopic node %d", mesoLinkTargetNodeID, mesoLink.ID, microNode.ID)
+			}
+			microNode.boundaryType = mesoLinkTargetNode.boundaryType
+
+		} else {
+			microNode.boundaryType = BOUNDARY_NONE
+		}
+	}
+	return nil
 }
