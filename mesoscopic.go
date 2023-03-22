@@ -486,7 +486,6 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 					outcomingMesoLinkSourceNodeID := outcomingMesoLink.sourceNodeID
 
 					outcomingMesoLink.sourceNodeID = incomingMesoLinkTargetNodeID
-
 					outcomingMesoLink.geom = append(orb.LineString{incomingMesoLink.geom[len(incomingMesoLink.geom)-1]}, outcomingMesoLink.geom[1:]...)
 					outcomingMesoLink.geomEuclidean = append(orb.LineString{incomingMesoLink.geomEuclidean[len(incomingMesoLink.geomEuclidean)-1]}, outcomingMesoLink.geomEuclidean[1:]...)
 
@@ -495,8 +494,16 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 					//@todo process micro?
 				} else if !incomingMacroLink.downstreamIsTarget && outcomingMacroLink.upstreamIsTarget {
 					//remove outgoing micro nodes and links of incomingMesoLink, then connect to outcomingMesoLink
+					incomingMesoLinkTargetNodeID := incomingMesoLink.targetNodeID
+					outcomingMesoLinkSourceNodeID := outcomingMesoLink.sourceNodeID
 
-					// @todo
+					incomingMesoLink.targetNodeID = outcomingMesoLinkSourceNodeID
+					incomingMesoLink.geom = append(incomingMesoLink.geom[:len(incomingMesoLink.geom)-1], outcomingMesoLink.geom[0])
+					incomingMesoLink.geomEuclidean = append(incomingMesoLink.geomEuclidean[:len(incomingMesoLink.geomEuclidean)-1], outcomingMesoLink.geomEuclidean[0])
+
+					delete(mesoNet.nodes, incomingMesoLinkTargetNodeID)
+
+					//@todo process micro?
 				}
 			}
 		}
