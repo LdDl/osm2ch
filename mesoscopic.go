@@ -345,9 +345,6 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 			lastMesoLinkID += 1
 			upstreamNodeID = downstreamMesoNode.ID // This must be done since current upstream node is downstream node for next segment
 		}
-
-		// @TODO: Create microscopic links since it could be done here
-		// Consider to have some flag to enable/disable this feature
 	}
 
 	mesoNet.maxLinkID = lastMesoLinkID
@@ -363,7 +360,7 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 
 	// Loop through each macroscopic
 	for _, macroNode := range macroNet.nodes {
-		// Loop through each movement of give node
+		// Loop through each movement for given node
 		for _, movement := range macroNode.movements {
 			// Extract macroscopic links
 			incomingMacroLinkID, outcomingMacroLinkID := movement.IncomingLinkID, movement.OutcomingLinkID
@@ -490,8 +487,6 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 					outcomingMesoLink.geomEuclidean = append(orb.LineString{incomingMesoLink.geomEuclidean[len(incomingMesoLink.geomEuclidean)-1]}, outcomingMesoLink.geomEuclidean[1:]...)
 
 					delete(mesoNet.nodes, outcomingMesoLinkSourceNodeID)
-
-					//@todo process micro? @CRITICAL
 				} else if !incomingMacroLink.downstreamIsTarget && outcomingMacroLink.upstreamIsTarget {
 					//remove outgoing micro nodes and links of incomingMesoLink, then connect to outcomingMesoLink
 					incomingMesoLinkTargetNodeID := incomingMesoLink.targetNodeID
@@ -502,8 +497,6 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 					incomingMesoLink.geomEuclidean = append(incomingMesoLink.geomEuclidean[:len(incomingMesoLink.geomEuclidean)-1], outcomingMesoLink.geomEuclidean[0])
 
 					delete(mesoNet.nodes, incomingMesoLinkTargetNodeID)
-
-					//@todo process micro? @CRITICAL
 				}
 			}
 		}

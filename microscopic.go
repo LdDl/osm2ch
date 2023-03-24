@@ -583,7 +583,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 	microscopic.maxNodeID = lastNodeID
 	microscopic.maxLinkID = lastLinkID
 
-	err := microscopic.connectLinks(mesoNet)
+	err := microscopic.connectLinks(macroNet, mesoNet)
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't connect microscopic links for movement layer")
 	}
@@ -617,7 +617,7 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 //
 // generated connections between links are links too
 //
-func (microNet *NetworkMicroscopic) connectLinks(mesoNet *NetworkMesoscopic) error {
+func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic) error {
 	lastNodeID := microNet.maxNodeID
 	lastLinkID := microNet.maxLinkID
 
@@ -772,6 +772,154 @@ func (microNet *NetworkMicroscopic) connectLinks(mesoNet *NetworkMesoscopic) err
 
 	microNet.maxNodeID = lastNodeID
 	microNet.maxLinkID = lastLinkID
+
+	return microNet.fixGaps(macroNet, mesoNet)
+}
+
+// fixGaps fixes gaps between microscopic links (it could happen sometimes)
+func (microNet *NetworkMicroscopic) fixGaps(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic) error {
+	// @TODO: this is copy-paste from mesoscopic network, should be refactored to avoid code duplication
+
+	// Loop through each macroscopic
+	for _, macroNode := range macroNet.nodes {
+		// Loop through each movement for given node
+		for _, movement := range macroNode.movements {
+			// Extract macroscopic links
+			incomingMacroLinkID, outcomingMacroLinkID := movement.IncomingLinkID, movement.OutcomingLinkID
+			incomingMacroLink, ok := macroNet.links[incomingMacroLinkID]
+			if !ok {
+				return fmt.Errorf("fixGaps(): Incoming macroscopic link %d not found", incomingMacroLinkID)
+			}
+			outcomingMacroLink, ok := macroNet.links[outcomingMacroLinkID]
+			if !ok {
+				return fmt.Errorf("fixGaps(): Outcoming macroscopic link %d not found", outcomingMacroLinkID)
+			}
+			// Collect lanes info
+			incomeLanes := make([]int, 0, movement.incomeLaneStart+movement.incomeLaneEnd)
+			for laneNo := movement.incomeLaneStart; laneNo <= movement.incomeLaneEnd; laneNo++ {
+				incomeLanes = append(incomeLanes, laneNo)
+			}
+			outcomeLanes := make([]int, 0, movement.outcomeLaneStart+movement.outcomeLaneEnd)
+			for laneNo := movement.outcomeLaneStart; laneNo <= movement.outcomeLaneEnd; laneNo++ {
+				outcomeLanes = append(outcomeLanes, laneNo)
+			}
+			// Minor check. If this conditions met, then something is wrong with movements layer
+			if len(incomeLanes) != len(outcomeLanes) {
+				fmt.Printf("Warning. Income and outcome lanes number mismatch for movement %d. Income: %d, outcome: %d. This movement will be ignored\n", movement.ID, len(incomeLanes), len(outcomeLanes))
+				continue
+			}
+			if intSliceContains(incomeLanes, 0) {
+				fmt.Printf("Warning. Income lanes contains 0 for movement %d. This movement will be ignored\n", movement.ID)
+				continue
+			}
+			if intSliceContains(outcomeLanes, 0) {
+				fmt.Printf("Warning. Outcome lanes contains 0 for movement %d. This movement will be ignored\n", movement.ID)
+				continue
+			}
+			// Extract corresponding mesoscopic links
+			incomingMesoLinkID := incomingMacroLink.mesolinks[len(incomingMacroLink.mesolinks)-1]
+			incomingMesoLink, ok := mesoNet.links[incomingMesoLinkID]
+			if !ok {
+				return fmt.Errorf("fixGaps(): Incoming mesoscopic link %d not found", incomingMesoLinkID)
+			}
+			outcomingMesoLinkID := outcomingMacroLink.mesolinks[0]
+			outcomingMesoLink, ok := mesoNet.links[outcomingMesoLinkID]
+			if !ok {
+				return fmt.Errorf("fixGaps(): Outcoming mesoscopic link %d not found", outcomingMesoLinkID)
+			}
+			// Calculate lanes indices
+			incomeLaneStart := incomingMesoLink.lanesChange[0] + incomeLanes[0]
+			if incomeLanes[0] >= 0 {
+				incomeLaneStart -= 1
+			}
+			incomeLaneEnd := incomingMesoLink.lanesChange[0] + incomeLanes[len(incomeLanes)-1]
+			if incomeLanes[len(incomeLanes)-1] >= 0 {
+				incomeLaneEnd -= 1
+			}
+			outcomeLaneStart := outcomingMesoLink.lanesChange[0] + outcomeLanes[0]
+			if outcomeLanes[0] >= 0 {
+				outcomeLaneStart -= 1
+			}
+			outcomeLaneEnd := outcomingMesoLink.lanesChange[0] + outcomeLanes[len(outcomeLanes)-1]
+			if outcomeLanes[len(outcomeLanes)-1] >= 0 {
+				outcomeLaneEnd -= 1
+			}
+			// Minor check. Ignore movements when inbound or outbound lane is not consistent (negative value)
+			if incomeLaneStart < 0 {
+				fmt.Printf("Warning. Income lane start is negative for movement %d. This movement will be ignored\n", movement.ID)
+				continue
+			}
+			if outcomeLaneStart < 0 {
+				fmt.Printf("Warning. Outcome lane start is negative for movement %d. This movement will be ignored\n", movement.ID)
+				continue
+			}
+			// Minor check. Ignore movements when inbound or outbound lane is greater than number of lanes
+			if incomeLaneEnd > incomingMesoLink.lanesNum-1 {
+				fmt.Printf("Warning. Income lane end %d is greater than number of lanes %d for movement %d. This movement will be ignored\n", incomeLaneEnd, incomingMesoLink.lanesNum-1, movement.ID)
+				continue
+			}
+			if outcomeLaneEnd > outcomingMesoLink.lanesNum-1 {
+				fmt.Printf("Warning. Outcome lane end %d is greater than number of lanes %d for movement %d. This movement will be ignored\n", outcomeLaneEnd, outcomingMesoLink.lanesNum-1, movement.ID)
+				continue
+			}
+			// Generate mesoscopic link if it's needed
+			lanesNum := len(incomeLanes)
+			if macroNode.movementIsNeeded {
+				continue
+			}
+			// The same workflow as for mesoscopic links but for micro links. The geometry re-evaluation is not needed since we want to have constant geometry length (see `cellLength``)
+			if incomingMacroLink.downstreamIsTarget && !outcomingMacroLink.upstreamIsTarget {
+				for i := 0; i < lanesNum; i++ {
+					incomeLaneIndex := incomeLaneStart + i
+					outcomeLaneIndex := outcomeLaneStart + i
+
+					incomeLane := incomingMesoLink.microNodesPerLane[incomeLaneIndex]
+					outcomeLane := outcomingMesoLink.microNodesPerLane[outcomeLaneIndex]
+
+					incomeMesoLinkOutMicroNodeID := incomeLane[len(incomeLane)-1]
+					outcomeMesoLinkInMicroNodeID := outcomeLane[0]
+
+					outcomeMesoLinkInMicroNode, ok := microNet.nodes[outcomeMesoLinkInMicroNodeID]
+					if !ok {
+						return fmt.Errorf("fixGaps(): Microscopic node %d at lane %d for outcoming mesoscopic link %d not found", outcomeMesoLinkInMicroNodeID, outcomeLaneIndex, outcomingMesoLinkID)
+					}
+					for _, microLinkID := range outcomeMesoLinkInMicroNode.outcomingLinks {
+						microLink, ok := microNet.links[microLinkID]
+						if !ok {
+							return fmt.Errorf("fixGaps(): Outcoming microscopic link %d for microscopic node %d not found", microLinkID, outcomeMesoLinkInMicroNodeID)
+						}
+						microLink.sourceNodeID = incomeMesoLinkOutMicroNodeID
+					}
+					delete(microNet.nodes, outcomeMesoLinkInMicroNodeID)
+				}
+			} else if !incomingMacroLink.downstreamIsTarget && outcomingMacroLink.upstreamIsTarget {
+				for i := 0; i < lanesNum; i++ {
+					incomeLaneIndex := incomeLaneStart + i
+					outcomeLaneIndex := outcomeLaneStart + i
+
+					incomeLane := incomingMesoLink.microNodesPerLane[incomeLaneIndex]
+					outcomeLane := outcomingMesoLink.microNodesPerLane[outcomeLaneIndex]
+
+					incomeMesoLinkOutMicroNodeID := incomeLane[len(incomeLane)-1]
+					outcomeMesoLinkInMicroNodeID := outcomeLane[0]
+
+					incomeMesoLinkOutMicroNode, ok := microNet.nodes[incomeMesoLinkOutMicroNodeID]
+					if !ok {
+						return fmt.Errorf("fixGaps(): Microscopic node %d at lane %d for incoming mesoscopic link %d not found", incomeMesoLinkOutMicroNodeID, incomeLaneIndex, incomingMesoLinkID)
+					}
+					for _, microLinkID := range incomeMesoLinkOutMicroNode.incomingLinks {
+						microLink, ok := microNet.links[microLinkID]
+						if !ok {
+							return fmt.Errorf("fixGaps(): Incoming microscopic link %d for microscopic node %d not found", microLinkID, incomeMesoLinkOutMicroNodeID)
+						}
+						microLink.targetNodeID = outcomeMesoLinkInMicroNodeID
+					}
+					delete(microNet.nodes, incomeMesoLinkOutMicroNodeID)
+				}
+			}
+		}
+
+	}
 	return nil
 }
 
