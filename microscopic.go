@@ -776,7 +776,11 @@ func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, m
 	return microNet.fixGaps(macroNet, mesoNet)
 }
 
-// fixGaps fixes gaps between microscopic links (it could happen sometimes)
+// fixGaps fixes gaps between microscopic links
+//
+// Most of time there is one mesoscopic link between two intersections in one direction or two if there are two directions
+// However, there are some cases when there are more than one consecutive mesoscopic links in same direction between two intersections (when there are some other macro nodes between two intersections)
+//
 func (microNet *NetworkMicroscopic) fixGaps(macroNet *NetworkMacroscopic, mesoNet *NetworkMesoscopic) error {
 	// @TODO: this is copy-paste from mesoscopic network, should be refactored to avoid code duplication
 
