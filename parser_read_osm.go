@@ -15,5 +15,9 @@ func (parser *Parser) createNetwork(verbose bool, poi bool) (*NetworkMacroscopic
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't prepare road network")
 	}
+
+	// @TODO: Postprocess isolated nodes
+	// @TODO: Postproces adjacent links at 2-degree nodes
+	// @TODO: Postprocess two-way overlapping links (by offsetting the geometry)
 	return net, nil
 }

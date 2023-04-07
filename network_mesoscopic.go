@@ -49,7 +49,7 @@ func (net *NetworkMesoscopic) exportLinksToCSV(fname string) error {
 	defer writer.Flush()
 	writer.Comma = ';'
 
-	err = writer.Write([]string{"id", "source_node", "target_node", "macro_node_id", "macro_link_id", "link_type", "control_type", "movement_composite_type", "allowed_agent_types", "lanes", "free_speed", "capacity", "length_meters", "geom"})
+	err = writer.Write([]string{"id", "source_node", "target_node", "macro_node_id", "macro_link_id", "link_type", "control_type", "movement_id", "movement_composite_type", "allowed_agent_types", "lanes", "free_speed", "capacity", "length_meters", "geom"})
 	if err != nil {
 		return errors.Wrap(err, "Can't write header")
 	}
@@ -67,6 +67,7 @@ func (net *NetworkMesoscopic) exportLinksToCSV(fname string) error {
 			fmt.Sprintf("%d", link.macroLinkID),
 			fmt.Sprintf("%s", link.linkType),
 			fmt.Sprintf("%s", link.controlType),
+			fmt.Sprintf("%d", link.movementID),
 			fmt.Sprintf("%s", link.movementCompositeType),
 			strings.Join(allowedAgentTypes, ","),
 			fmt.Sprintf("%d", link.lanesNum),
