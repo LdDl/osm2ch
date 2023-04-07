@@ -56,6 +56,8 @@ type WayData struct {
 	Oneway             bool
 	OnewayDefault      bool
 	IsReversed         bool
+	// POI information
+	wayPOI string // Should match highway, railway or aeroway (depends on way type
 }
 
 var (

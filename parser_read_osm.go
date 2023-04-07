@@ -2,7 +2,7 @@ package osm2ch
 
 import "github.com/pkg/errors"
 
-func (parser *Parser) createNetwork(verbose bool) (*NetworkMacroscopic, error) {
+func (parser *Parser) createNetwork(verbose bool, poi bool) (*NetworkMacroscopic, error) {
 	/* Fill fields in case they haven't been provided earlier */
 	if len(parser.networkTypes) == 0 {
 		parser.networkTypes = []string{"auto"}
@@ -11,7 +11,7 @@ func (parser *Parser) createNetwork(verbose bool) (*NetworkMacroscopic, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't parse OSM data")
 	}
-	net, err := dataOSM.prepareNetwork(verbose)
+	net, err := dataOSM.prepareNetwork(verbose, poi)
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't prepare road network")
 	}

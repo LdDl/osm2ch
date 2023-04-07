@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func (data *OSMDataRaw) prepareWays(verbose bool) error {
+func (data *OSMDataRaw) prepareWays(verbose bool, poi bool) error {
 
 	if verbose {
 		fmt.Printf("Prepare ways...")
@@ -13,9 +13,11 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 	st := time.Now()
 
 	data.waysMedium = make([]*WayData, 0, len(data.ways))
+	data.waysPOI = make([]*WayData, 0, len(data.ways)/2)
+
 	for _, way := range data.ways {
 		if way.isPOI() {
-			// @TODO: handle POI
+			data.waysPOI = append(data.waysPOI, way)
 			continue
 		}
 
@@ -34,7 +36,8 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 		}
 		if way.isHighway() {
 			if way.isHighwayPOI() {
-				// @TODO: handle POI
+				way.wayPOI = way.highway
+				data.waysPOI = append(data.waysPOI, way)
 				continue
 			}
 			// Ignore ways `area` tag provided
@@ -85,15 +88,19 @@ func (data *OSMDataRaw) prepareWays(verbose bool) error {
 			}
 			data.waysMedium = append(data.waysMedium, way)
 		} else if way.isRailway() {
+			fmt.Println("wwwww railways")
 			// @TODO: handle railways
 			if way.isRailwayPOI() {
-				// @TODO: handle POI
+				way.wayPOI = way.railway
+				data.waysPOI = append(data.waysPOI, way)
 				continue
 			}
 		} else if way.isAeroway() {
 			// @TODO: handle aeroways
+			fmt.Println("wwwww aeroways")
 			if way.isAerowayPOI() {
-				// @TODO: handle POI
+				way.wayPOI = way.aeroway
+				data.waysPOI = append(data.waysPOI, way)
 				continue
 			}
 		} else {

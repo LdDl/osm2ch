@@ -4,8 +4,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (data *OSMDataRaw) prepareWaysAndNodes(verbose bool) error {
-	err := data.prepareWays(verbose)
+func (data *OSMDataRaw) prepareWaysAndNodes(verbose bool, poi bool) error {
+	err := data.prepareWays(verbose, poi)
 	if err != nil {
 		return errors.Wrap(err, "Can't prepare ways")
 	}

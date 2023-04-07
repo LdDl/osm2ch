@@ -25,7 +25,10 @@ type OSMDataRaw struct {
 	restrictions map[string]map[restrictionComponent]map[restrictionComponent]restrictionComponent
 	nodes        map[osm.NodeID]*Node
 	ways         []*WayData
-	waysMedium   []*WayData
+	relations    []*OSMRelation
+
+	waysMedium []*WayData
+	waysPOI    []*WayData
 
 	allowedAgentTypes []AgentType
 }
@@ -341,8 +344,8 @@ func readOSM(filename string, verbose bool) (*OSMDataRaw, error) {
 	return &data, nil
 }
 
-func (data *OSMDataRaw) prepareNetwork(verbose bool) (*NetworkMacroscopic, error) {
-	err := data.prepareWaysAndNodes(verbose)
+func (data *OSMDataRaw) prepareNetwork(verbose bool, poi bool) (*NetworkMacroscopic, error) {
+	err := data.prepareWaysAndNodes(verbose, poi)
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't prepare ways or nodes")
 	}
@@ -435,6 +438,12 @@ func (data *OSMDataRaw) prepareNodesAndLinks(verbose bool) (map[NetworkNodeID]*N
 	return nodes, links, nil
 }
 
+func (data *OSMDataRaw) prepareRelations(verbose bool) error {
+	// for _, relation := range data.relations {
+
+	// }
+	return nil
+}
 func (way *WayData) prepareSegments(nodes map[osm.NodeID]*Node) {
 	nodesNum := len(way.Nodes)
 	lastNodeIdx := 0

@@ -12,9 +12,10 @@ func TestParser(t *testing.T) {
 	)
 	t.Log(parser)
 	verbose := true
+	enablePOI := false
 
 	/* Macroscopic */
-	netMacro, err := parser.createNetwork(verbose)
+	netMacro, err := parser.createNetwork(verbose, enablePOI)
 	if err != nil {
 		t.Error(err)
 		return
