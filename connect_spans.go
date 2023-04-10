@@ -28,9 +28,11 @@ func getSpansConnections(outcomingLink *NetworkLink, incomingLinksList []*Networ
 	}
 	// Evaluate lanes connections
 	connections := make([][]connectionPair, len(incomingLinksSorted))
-	outcomingLanes := outcomingLink.lanesList[len(outcomingLink.lanesList)-1]
+	outcomingLanes := outcomingLink.GetIncomingLanes()
+
 	leftLink := incomingLinksSorted[0]
-	leftLinkOutcomingLanes := leftLink.lanesList[len(leftLink.lanesList)-1]
+	leftLinkOutcomingLanes := leftLink.GetOutcomingLanes()
+
 	minConnections := min(outcomingLanes, leftLinkOutcomingLanes)
 	// In <-> Out
 	connections[indicesMap[leftLink.ID]] = []connectionPair{{leftLinkOutcomingLanes - minConnections, leftLinkOutcomingLanes - 1}, {0, minConnections - 1}}

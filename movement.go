@@ -26,12 +26,17 @@ type Movement struct {
 	IncomingLinkID  NetworkLinkID
 	OutcomingLinkID NetworkLinkID
 
-	movementCompositeType            MovementCompositeType
-	movementType                     MovementType
-	controlType                      ControlType
+	movementCompositeType MovementCompositeType
+	movementType          MovementType
+	controlType           ControlType
+
+	startIncomeLaneSeqID, endIncomeLaneSeqID   int
+	startOutcomeLaneSeqID, endOutcomeLaneSeqID int
+
 	incomeLaneStart, incomeLaneEnd   int
 	outcomeLaneStart, outcomeLaneEnd int
-	lanesNum                         int
+
+	lanesNum int
 }
 
 // movementBetweenLines returns movement information for given lines pair
@@ -177,6 +182,11 @@ func (net *NetworkMacroscopic) genMovement(verbose bool) error {
 		fmt.Print("Preparing movements...")
 	}
 	st := time.Now()
+
+	for _, link := range net.links {
+		link.prepareLanes()
+	}
+
 	mvmtID := MovementID(0)
 	for _, node := range net.nodes {
 		mvmtList := node.genMovement(&mvmtID, net.links)

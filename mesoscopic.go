@@ -3,7 +3,6 @@ package osm2ch
 import (
 	"fmt"
 	"math"
-	"sort"
 	"time"
 
 	"github.com/paulmach/orb"
@@ -31,36 +30,6 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		links:             make(map[NetworkLinkID]*NetworkLinkMesoscopic),
 		expandedMesoNodes: make(map[NetworkNodeID]int),
 	}
-
-	/* Prepare segments */
-	for _, link := range net.links {
-		breakpoints := []float64{0, link.lengthMeters}
-		if link.lengthMeters <= resolution {
-			link.breakpoints = make([]float64, len(breakpoints))
-		} else {
-			for len(breakpoints) != 0 {
-				target := breakpoints[0]
-				remove := make(map[int]struct{})
-				for idx, point := range breakpoints {
-					if target-resolution <= point && point <= target+resolution {
-						remove[idx] = struct{}{}
-					}
-				}
-				link.breakpoints = append(link.breakpoints, target)
-				for idx := range remove {
-					breakpoints = append(breakpoints[:idx], breakpoints[idx+1:]...)
-				}
-			}
-			sort.Float64s(link.breakpoints)
-		}
-		lanes := link.GetLanes()
-		link.lanesList = make([]int, 0, len(link.breakpoints)-1)
-		for i := 0; i < len(link.breakpoints)-1; i++ {
-			link.lanesList = append(link.lanesList, lanes)
-			link.lanesChange = append(link.lanesChange, []int{0.0, 0.0})
-		}
-	}
-	/* */
 
 	/* Offset geometies */
 	observed := make(map[NetworkLinkID]bool)
@@ -113,8 +82,8 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 	for _, link := range net.links {
 		// Re-calcuate length for offset geometry and round to 2 decimal places
 		link.lengthMetersOffset = math.Round(geo.LengthHaversign(link.geomOffset)*100.0) / 100.0
-		for i, item := range link.breakpoints {
-			link.breakpoints[i] = (item / link.lengthMeters) * link.lengthMetersOffset
+		for i, item := range link.lanesChangePoints {
+			link.lanesChangePoints[i] = (item / link.lengthMeters) * link.lengthMetersOffset
 		}
 	}
 	/* */
@@ -126,6 +95,26 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 		}
 		if len(node.incomingLinks) == 1 && len(node.outcomingLinks) >= 1 {
 			// Only one incoming link
+			incomingLink, ok := net.links[node.incomingLinks[0]]
+			if !ok {
+				return nil, fmt.Errorf("Macroscopic node %d: incoming macroscopic link %d not found. Should not happen [Loop over nodes]", node.ID, node.incomingLinks[0])
+			}
+			badAngle := true
+			for _, outcomingLinkID := range node.outcomingLinks {
+				outcomingLink, ok := net.links[outcomingLinkID]
+				if !ok {
+					return nil, fmt.Errorf("Macroscopic node %d: outcoming macroscopic link %d not found. Should not happen [Loop over outcoming links]", node.ID, outcomingLinkID)
+				}
+				angle := angleBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
+				if angle > 0.75*math.Pi || angle < -0.75*math.Pi {
+					badAngle = false
+					break
+				}
+			}
+			if !badAngle {
+				continue
+			}
+
 			observed := make(map[NetworkLinkID]struct{})
 			multipleConnections := false
 			for _, movement := range node.movements {
@@ -140,22 +129,38 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 				continue
 			}
 			node.movementIsNeeded = false
-			linkID := node.incomingLinks[0]
-			if link, ok := net.links[linkID]; ok {
-				link.downstreamShortCut = true
-				link.downstreamIsTarget = true
-				for _, outcomingLinkID := range node.outcomingLinks {
-					if outcomingLink, ok := net.links[outcomingLinkID]; ok {
-						outcomingLink.upstreamShortCut = true
-					} else {
-						return nil, fmt.Errorf("nested outcoming link %d not found. Should not happen [Process movements]", linkID)
-					}
+			incomingLink.downstreamShortCut = true
+			incomingLink.downstreamIsTarget = true
+			for _, outcomingLinkID := range node.outcomingLinks {
+				if outcomingLink, ok := net.links[outcomingLinkID]; ok {
+					outcomingLink.upstreamShortCut = true
+				} else {
+					return nil, fmt.Errorf("nested outcoming link %d not found. Should not happen [Process movements]", incomingLink.ID)
 				}
-			} else {
-				return nil, fmt.Errorf("incoming link %d not found. Should not happen [Process movements]", linkID)
 			}
 		} else if len(node.outcomingLinks) == 1 && len(node.incomingLinks) >= 1 {
 			// Only one outcoming link
+
+			outcomingLink, ok := net.links[node.outcomingLinks[0]]
+			if !ok {
+				return nil, fmt.Errorf("Macroscopic node %d: outcoming macroscopic link %d not found. Should not happen [Loop over nodes]", node.ID, node.incomingLinks[0])
+			}
+			badAngle := true
+			for _, incomingLinkID := range node.outcomingLinks {
+				incomingLink, ok := net.links[incomingLinkID]
+				if !ok {
+					return nil, fmt.Errorf("Macroscopic node %d: incoming macroscopic link %d not found. Should not happen [Loop over outcoming links]", node.ID, incomingLinkID)
+				}
+				angle := angleBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
+				if angle > 0.75*math.Pi || angle < -0.75*math.Pi {
+					badAngle = false
+					break
+				}
+			}
+			if !badAngle {
+				continue
+			}
+
 			observed := make(map[NetworkLinkID]struct{})
 			multipleConnections := false
 			for _, movement := range node.movements {
@@ -170,19 +175,14 @@ func (net *NetworkMacroscopic) genMesoscopicNetwork(verbose bool) (*NetworkMesos
 				continue
 			}
 			node.movementIsNeeded = false
-			linkID := node.outcomingLinks[0]
-			if link, ok := net.links[linkID]; ok {
-				link.upstreamShortCut = true
-				link.upstreamIsTarget = true
-				for _, incomingLinkID := range node.incomingLinks {
-					if incomingLink, ok := net.links[incomingLinkID]; ok {
-						incomingLink.downstreamShortCut = true
-					} else {
-						return nil, fmt.Errorf("nested incoming link %d not found. Should not happen [Process movements]", linkID)
-					}
+			outcomingLink.upstreamShortCut = true
+			outcomingLink.upstreamIsTarget = true
+			for _, incomingLinkID := range node.incomingLinks {
+				if incomingLink, ok := net.links[incomingLinkID]; ok {
+					incomingLink.downstreamShortCut = true
+				} else {
+					return nil, fmt.Errorf("nested incoming link %d not found. Should not happen [Process movements]", outcomingLink.ID)
 				}
-			} else {
-				return nil, fmt.Errorf("outcoming link %d not found. Should not happen [Process movements]", linkID)
 			}
 		}
 	}
@@ -330,11 +330,11 @@ func (mesoNet *NetworkMesoscopic) generateLinks(macroNet *NetworkMacroscopic) er
 				macroNodeID:   -1,
 				lengthMeters:  geo.LengthHaversign(link.geomOffsetCut[segmentIdx]),
 				// Default movement
-				movementCompositeType:    MOVEMENT_NONE,
-				movementLinkIncome:       NetworkLinkID(-1),
-				movementLinkOutcome:      NetworkLinkID(-1),
-				movementIncomeLaneStart:  -1,
-				movementOutcomeLaneStart: -1,
+				movementCompositeType:         MOVEMENT_NONE,
+				movementLinkIncome:            NetworkLinkID(-1),
+				movementLinkOutcome:           NetworkLinkID(-1),
+				movementIncomeLaneStartSeqID:  -1,
+				movementOutcomeLaneStartSeqID: -1,
 			}
 
 			link.mesolinks = append(link.mesolinks, mesoLink.ID)
@@ -374,28 +374,28 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 			}
 
 			// Collect lanes info
-			incomeLanes := make([]int, 0, movement.incomeLaneStart+movement.incomeLaneEnd)
-			for laneNo := movement.incomeLaneStart; laneNo <= movement.incomeLaneEnd; laneNo++ {
-				incomeLanes = append(incomeLanes, laneNo)
-			}
-			outcomeLanes := make([]int, 0, movement.outcomeLaneStart+movement.outcomeLaneEnd)
-			for laneNo := movement.outcomeLaneStart; laneNo <= movement.outcomeLaneEnd; laneNo++ {
-				outcomeLanes = append(outcomeLanes, laneNo)
-			}
+			// incomeLanes := make([]int, 0, movement.incomeLaneStart+movement.incomeLaneEnd)
+			// for laneNo := movement.incomeLaneStart; laneNo <= movement.incomeLaneEnd; laneNo++ {
+			// 	incomeLanes = append(incomeLanes, laneNo)
+			// }
+			// outcomeLanes := make([]int, 0, movement.outcomeLaneStart+movement.outcomeLaneEnd)
+			// for laneNo := movement.outcomeLaneStart; laneNo <= movement.outcomeLaneEnd; laneNo++ {
+			// 	outcomeLanes = append(outcomeLanes, laneNo)
+			// }
 
-			// Minor check. If this conditions met, then something is wrong with movements layer
-			if len(incomeLanes) != len(outcomeLanes) {
-				fmt.Printf("Warning. Income and outcome lanes number mismatch for movement %d. Income: %d, outcome: %d. This movement will be ignored\n", movement.ID, len(incomeLanes), len(outcomeLanes))
-				continue
-			}
-			if intSliceContains(incomeLanes, 0) {
-				fmt.Printf("Warning. Income lanes contains 0 for movement %d. This movement will be ignored\n", movement.ID)
-				continue
-			}
-			if intSliceContains(outcomeLanes, 0) {
-				fmt.Printf("Warning. Outcome lanes contains 0 for movement %d. This movement will be ignored\n", movement.ID)
-				continue
-			}
+			// // Minor check. If this conditions met, then something is wrong with movements layer
+			// if len(incomeLanes) != len(outcomeLanes) {
+			// 	fmt.Printf("Warning. Income and outcome lanes number mismatch for movement %d. Income: %d, outcome: %d. This movement will be ignored\n", movement.ID, len(incomeLanes), len(outcomeLanes))
+			// 	continue
+			// }
+			// if intSliceContains(incomeLanes, 0) {
+			// 	fmt.Printf("Warning. Income lanes contains 0 for movement %d. This movement will be ignored\n", movement.ID)
+			// 	continue
+			// }
+			// if intSliceContains(outcomeLanes, 0) {
+			// 	fmt.Printf("Warning. Outcome lanes contains 0 for movement %d. This movement will be ignored\n", movement.ID)
+			// 	continue
+			// }
 
 			// Extract corresponding mesoscopic links
 			incomingMesoLinkID := incomingMacroLink.mesolinks[len(incomingMacroLink.mesolinks)-1]
@@ -410,51 +410,52 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 			}
 
 			// Calculate lanes indices
-			incomeLaneStart := incomingMesoLink.lanesChange[0] + incomeLanes[0]
-			if incomeLanes[0] >= 0 {
-				incomeLaneStart -= 1
-			}
-			incomeLaneEnd := incomingMesoLink.lanesChange[0] + incomeLanes[len(incomeLanes)-1]
-			if incomeLanes[len(incomeLanes)-1] >= 0 {
-				incomeLaneEnd -= 1
-			}
-			outcomeLaneStart := outcomingMesoLink.lanesChange[0] + outcomeLanes[0]
-			if outcomeLanes[0] >= 0 {
-				outcomeLaneStart -= 1
-			}
-			outcomeLaneEnd := outcomingMesoLink.lanesChange[0] + outcomeLanes[len(outcomeLanes)-1]
-			if outcomeLanes[len(outcomeLanes)-1] >= 0 {
-				outcomeLaneEnd -= 1
-			}
+			// incomeLaneStart := incomingMesoLink.lanesChange[0] + incomeLanes[0]
+			// if incomeLanes[0] >= 0 {
+			// 	incomeLaneStart -= 1
+			// }
+			// incomeLaneEnd := incomingMesoLink.lanesChange[0] + incomeLanes[len(incomeLanes)-1]
+			// if incomeLanes[len(incomeLanes)-1] >= 0 {
+			// 	incomeLaneEnd -= 1
+			// }
+			// outcomeLaneStart := outcomingMesoLink.lanesChange[0] + outcomeLanes[0]
+			// if outcomeLanes[0] >= 0 {
+			// 	outcomeLaneStart -= 1
+			// }
+			// outcomeLaneEnd := outcomingMesoLink.lanesChange[0] + outcomeLanes[len(outcomeLanes)-1]
+			// if outcomeLanes[len(outcomeLanes)-1] >= 0 {
+			// 	outcomeLaneEnd -= 1
+			// }
 
 			// Minor check. Ignore movements when inbound or outbound lane is not consistent (negative value)
-			if incomeLaneStart < 0 {
-				fmt.Printf("Warning. Income lane start is negative for movement %d. This movement will be ignored\n", movement.ID)
-				continue
-			}
-			if outcomeLaneStart < 0 {
-				fmt.Printf("Warning. Outcome lane start is negative for movement %d. This movement will be ignored\n", movement.ID)
-				continue
-			}
-			// Minor check. Ignore movements when inbound or outbound lane is greater than number of lanes
-			if incomeLaneEnd > incomingMesoLink.lanesNum-1 {
-				fmt.Printf("Warning. Income lane end %d is greater than number of lanes %d for movement %d. This movement will be ignored\n", incomeLaneEnd, incomingMesoLink.lanesNum-1, movement.ID)
-				continue
-			}
-			if outcomeLaneEnd > outcomingMesoLink.lanesNum-1 {
-				fmt.Printf("Warning. Outcome lane end %d is greater than number of lanes %d for movement %d. This movement will be ignored\n", outcomeLaneEnd, outcomingMesoLink.lanesNum-1, movement.ID)
-				continue
-			}
+			// if incomeLaneStart < 0 {
+			// 	fmt.Printf("Warning. Income lane start is negative for movement %d. This movement will be ignored\n", movement.ID)
+			// 	continue
+			// }
+			// if outcomeLaneStart < 0 {
+			// 	fmt.Printf("Warning. Outcome lane start is negative for movement %d. This movement will be ignored\n", movement.ID)
+			// 	continue
+			// }
+			// // Minor check. Ignore movements when inbound or outbound lane is greater than number of lanes
+			// if incomeLaneEnd > incomingMesoLink.lanesNum-1 {
+			// 	fmt.Printf("Warning. Income lane end %d is greater than number of lanes %d for movement %d. This movement will be ignored\n", incomeLaneEnd, incomingMesoLink.lanesNum-1, movement.ID)
+			// 	continue
+			// }
+			// if outcomeLaneEnd > outcomingMesoLink.lanesNum-1 {
+			// 	fmt.Printf("Warning. Outcome lane end %d is greater than number of lanes %d for movement %d. This movement will be ignored\n", outcomeLaneEnd, outcomingMesoLink.lanesNum-1, movement.ID)
+			// 	continue
+			// }
 
 			// Generate mesoscopic link if it's needed
-			lanesNum := len(incomeLanes)
+			// lanesNum := len(incomeLanes)
 			if macroNode.movementIsNeeded {
 				mesoLink := NetworkLinkMesoscopic{
-					ID:            lastMesoLinkID,
-					sourceNodeID:  incomingMesoLink.targetNodeID,
-					targetNodeID:  outcomingMesoLink.sourceNodeID,
-					lanesNum:      lanesNum,
-					lanesChange:   make([]int, 0),
+					ID:           lastMesoLinkID,
+					sourceNodeID: incomingMesoLink.targetNodeID,
+					targetNodeID: outcomingMesoLink.sourceNodeID,
+					lanesNum:     movement.lanesNum,
+					// lanesNum:      lanesNum,
+					lanesChange:   [2]int{},
 					geom:          orb.LineString{incomingMesoLink.geom[len(incomingMesoLink.geom)-1], outcomingMesoLink.geom[0]},
 					geomEuclidean: orb.LineString{incomingMesoLink.geomEuclidean[len(incomingMesoLink.geomEuclidean)-1], outcomingMesoLink.geomEuclidean[0]},
 					macroLinkID:   -1,
@@ -463,11 +464,13 @@ func (mesoNet *NetworkMesoscopic) connectLinks(macroNet *NetworkMacroscopic) err
 					macroNodeID:   macroNode.ID,
 					lengthMeters:  geo.LengthHaversign(orb.LineString{incomingMesoLink.geom[len(incomingMesoLink.geom)-1], outcomingMesoLink.geom[0]}),
 					// Inherit movement properties
-					movementCompositeType:    movement.movementCompositeType,
-					movementLinkIncome:       incomingMesoLinkID,
-					movementLinkOutcome:      outcomingMesoLinkID,
-					movementIncomeLaneStart:  incomeLaneStart,
-					movementOutcomeLaneStart: outcomeLaneStart,
+					movementCompositeType: movement.movementCompositeType,
+					movementLinkIncome:    incomingMesoLinkID,
+					movementLinkOutcome:   outcomingMesoLinkID,
+					// movementIncomeLaneStartSeqID:  incomeLaneStart,
+					// movementOutcomeLaneStartSeqID: outcomeLaneStart,
+					movementIncomeLaneStartSeqID:  movement.startIncomeLaneSeqID,
+					movementOutcomeLaneStartSeqID: movement.startOutcomeLaneSeqID,
 				}
 				mesoNet.links[mesoLink.ID] = &mesoLink
 				lastMesoLinkID += 1

@@ -54,20 +54,21 @@ func networkNodeFromOSM(id NetworkNodeID, nodeOSM *Node) *NetworkNode {
 	return &node
 }
 
-// genMovement generates Movement
+// genMovement generates set of movement for given node
 func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLinkID]*NetworkLink) []*Movement {
-	response := []*Movement{}
+	movements := []*Movement{}
 
 	if movementID == nil {
-		return response
+		return movements
 	}
 	income := len(node.incomingLinks)
 	outcome := len(node.outcomingLinks)
 	if income == 0 || outcome == 0 {
-		return response
+		return movements
 	}
 
 	if outcome == 1 {
+		// Merge
 		incomingLinksList := []*NetworkLink{}
 		outcomingLinkID := node.outcomingLinks[0]
 		outcomingLink, ok := links[outcomingLinkID]
@@ -78,45 +79,56 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 						incomingLinksList = append(incomingLinksList, incomingLink)
 					}
 				} else {
-					return response
+					return movements
 				}
 			}
 		}
 		if len(incomingLinksList) == 0 {
-			return response
+			return movements
 		}
 
 		connections := getSpansConnections(outcomingLink, incomingLinksList)
+
+		incomingLaneIndices := outcomingLink.GetOutcomingLaneIndices()
+
 		for i, incomingLink := range incomingLinksList {
-			incomeLaneStart := connections[i][0].first + 1
-			incomeLaneEnd := connections[i][0].second + 1
-			outcomeLaneStart := connections[i][1].first + 1
-			outcomeLaneEnd := connections[i][1].second + 1
-			lanesNum := incomeLaneEnd - incomeLaneStart + 1
+			incomeLaneIndexStart := connections[i][0].first
+			incomeLaneIndexEnd := connections[i][0].second
+			outcomeLaneIndexStart := connections[i][1].first
+			outcomeLaneIndexEnd := connections[i][1].second
+			lanesNum := incomeLaneIndexEnd - incomeLaneIndexStart + 1
 			allowedAgentTypes := make([]AgentType, len(incomingLink.allowedAgentTypes))
 			copy(allowedAgentTypes, incomingLink.allowedAgentTypes)
+
+			outcomingLaneIndices := incomingLink.GetOutcomingLaneIndices()
 			mvmt := Movement{
-				ID:                *movementID,
-				NodeID:            node.ID,
-				osmNodeID:         node.osmNodeID,
-				IncomingLinkID:    incomingLink.ID,
-				OutcomingLinkID:   outcomingLink.ID,
-				incomeLaneStart:   incomeLaneStart,
-				incomeLaneEnd:     incomeLaneEnd,
-				outcomeLaneStart:  outcomeLaneStart,
-				outcomeLaneEnd:    outcomeLaneEnd,
-				lanesNum:          lanesNum,
-				fromOsmNodeID:     incomingLink.sourceOsmNodeID,
-				toOsmNodeID:       outcomingLink.targetOsmNodeID,
-				controlType:       node.controlType,
-				allowedAgentTypes: allowedAgentTypes,
+				ID:                    *movementID,
+				NodeID:                node.ID,
+				osmNodeID:             node.osmNodeID,
+				IncomingLinkID:        incomingLink.ID,
+				OutcomingLinkID:       outcomingLink.ID,
+				startIncomeLaneSeqID:  incomeLaneIndexStart,
+				endIncomeLaneSeqID:    incomeLaneIndexEnd,
+				startOutcomeLaneSeqID: outcomeLaneIndexStart,
+				endOutcomeLaneSeqID:   outcomeLaneIndexEnd,
+				incomeLaneStart:       outcomingLaneIndices[incomeLaneIndexStart],
+				incomeLaneEnd:         outcomingLaneIndices[incomeLaneIndexEnd],
+				outcomeLaneStart:      incomingLaneIndices[outcomeLaneIndexStart],
+				outcomeLaneEnd:        incomingLaneIndices[outcomeLaneIndexEnd],
+				lanesNum:              lanesNum,
+				fromOsmNodeID:         incomingLink.sourceOsmNodeID,
+				toOsmNodeID:           outcomingLink.targetOsmNodeID,
+				controlType:           node.controlType,
+				allowedAgentTypes:     allowedAgentTypes,
 			}
 			mvmt.movementCompositeType, mvmt.movementType = movementBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
 			mvmt.geom = movementGeomBetweenLines(incomingLink.geom, outcomingLink.geom)
 			*movementID++
-			response = append(response, &mvmt)
+			movements = append(movements, &mvmt)
 		}
 	} else {
+		// Diverge
+		// Intersections
 		for _, incomingLinkID := range node.incomingLinks {
 			if incomingLink, ok := links[incomingLinkID]; ok {
 				outcomingLinksList := []*NetworkLink{}
@@ -126,50 +138,59 @@ func (node *NetworkNode) genMovement(movementID *MovementID, links map[NetworkLi
 							outcomingLinksList = append(outcomingLinksList, outcomingLink)
 						}
 					} else {
-						return response
+						return movements
 					}
 				}
 				if len(outcomingLinksList) == 0 {
-					return response
+					return movements
 				}
+
 				connections := getIntersectionsConnections(incomingLink, outcomingLinksList)
+
+				outcomingLaneIndices := incomingLink.GetOutcomingLaneIndices()
+
 				for i, outcomingLink := range outcomingLinksList {
-					incomeLaneStart := connections[i][0].first + 1
-					incomeLaneEnd := connections[i][0].second + 1
-					outcomeLaneStart := connections[i][1].first + 1
-					outcomeLaneEnd := connections[i][1].second + 1
-					lanesNum := incomeLaneEnd - incomeLaneStart + 1
+					incomeLaneIndexStart := connections[i][0].first
+					incomeLaneIndexEnd := connections[i][0].second
+					outcomeLaneIndexStart := connections[i][1].first
+					outcomeLaneIndexEnd := connections[i][1].second
+					lanesNum := incomeLaneIndexEnd - incomeLaneIndexStart + 1
 					allowedAgentTypes := make([]AgentType, len(incomingLink.allowedAgentTypes))
 					copy(allowedAgentTypes, incomingLink.allowedAgentTypes)
 
+					incomingLaneIndices := outcomingLink.GetOutcomingLaneIndices()
 					mvmt := Movement{
-						ID:                *movementID,
-						NodeID:            node.ID,
-						osmNodeID:         node.osmNodeID,
-						IncomingLinkID:    incomingLinkID,
-						OutcomingLinkID:   outcomingLink.ID,
-						incomeLaneStart:   incomeLaneStart,
-						incomeLaneEnd:     incomeLaneEnd,
-						outcomeLaneStart:  outcomeLaneStart,
-						outcomeLaneEnd:    outcomeLaneEnd,
-						lanesNum:          lanesNum,
-						fromOsmNodeID:     incomingLink.sourceOsmNodeID,
-						toOsmNodeID:       outcomingLink.targetOsmNodeID,
-						controlType:       node.controlType,
-						allowedAgentTypes: allowedAgentTypes,
+						ID:                    *movementID,
+						NodeID:                node.ID,
+						osmNodeID:             node.osmNodeID,
+						IncomingLinkID:        incomingLink.ID,
+						OutcomingLinkID:       outcomingLink.ID,
+						startIncomeLaneSeqID:  incomeLaneIndexStart,
+						endIncomeLaneSeqID:    incomeLaneIndexEnd,
+						startOutcomeLaneSeqID: outcomeLaneIndexStart,
+						endOutcomeLaneSeqID:   outcomeLaneIndexEnd,
+						incomeLaneStart:       outcomingLaneIndices[incomeLaneIndexStart],
+						incomeLaneEnd:         outcomingLaneIndices[incomeLaneIndexEnd],
+						outcomeLaneStart:      incomingLaneIndices[outcomeLaneIndexStart],
+						outcomeLaneEnd:        incomingLaneIndices[outcomeLaneIndexEnd],
+						lanesNum:              lanesNum,
+						fromOsmNodeID:         incomingLink.sourceOsmNodeID,
+						toOsmNodeID:           outcomingLink.targetOsmNodeID,
+						controlType:           node.controlType,
+						allowedAgentTypes:     allowedAgentTypes,
 					}
 					mvmt.movementCompositeType, mvmt.movementType = movementBetweenLines(incomingLink.geomEuclidean, outcomingLink.geomEuclidean)
 					mvmt.geom = movementGeomBetweenLines(incomingLink.geom, outcomingLink.geom)
 					*movementID++
-					response = append(response, &mvmt)
+					movements = append(movements, &mvmt)
 
 				}
 			} else {
-				return response
+				return movements
 			}
 		}
 	}
-	node.movements = make([]*Movement, 0, len(response))
-	node.movements = append(node.movements, response...)
-	return response
+	node.movements = make([]*Movement, 0, len(movements))
+	node.movements = append(node.movements, movements...)
+	return movements
 }

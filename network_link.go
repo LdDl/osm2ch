@@ -1,7 +1,9 @@
 package osm2ch
 
 import (
+	"fmt"
 	"math"
+	"sort"
 
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geo"
@@ -15,7 +17,6 @@ type NetworkLink struct {
 	name               string
 	geom               orb.LineString
 	geomEuclidean      orb.LineString
-	lanesList          []int
 	lengthMeters       float64
 	freeSpeed          float64
 	maxSpeed           float64
@@ -35,12 +36,14 @@ type NetworkLink struct {
 
 	wasBidirectional bool
 
-	/* Mesoscopic */
+	lanesNew int
+	/* For Mesoscopic and Microscopic */
 	mesolinks              []NetworkLinkID
-	breakpoints            []float64
+	lanesList              []int
 	lanesListCut           []int
-	lanesChange            [][]int
-	lanesChangeCut         [][]int
+	lanesChangePoints      []float64
+	lanesChange            [][2]int
+	lanesChangeCut         [][2]int
 	geomOffset             orb.LineString
 	geomOffsetCut          []orb.LineString
 	geomEuclideanOffset    orb.LineString
@@ -87,7 +90,7 @@ func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNode
 
 	link := NetworkLink{
 		name:               wayOSM.name,
-		lanesList:          make([]int, 1),
+		lanesList:          make([]int, 0),
 		freeSpeed:          freeSpeed,
 		maxSpeed:           maxSpeed,
 		capacity:           capacity,
@@ -109,31 +112,31 @@ func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNode
 		link.wasBidirectional = true
 	}
 	if wayOSM.Oneway {
-		link.lanesList[0] = wayOSM.lanes
+		link.lanesNew = wayOSM.lanes
 	} else {
 		switch direction {
 		case DIRECTION_FORWARD:
 			if wayOSM.lanesForward > 0 {
-				link.lanesList[0] = wayOSM.lanesForward
+				link.lanesNew = wayOSM.lanesForward
 			} else if wayOSM.lanes > 0 {
-				link.lanesList[0] = int(math.Ceil(float64(wayOSM.lanes) / 2.0))
+				link.lanesNew = int(math.Ceil(float64(wayOSM.lanes) / 2.0))
 			} else {
-				link.lanesList[0] = wayOSM.lanes
+				link.lanesNew = wayOSM.lanes
 			}
 		case DIRECTION_BACKWARD:
 			if wayOSM.lanesBackward >= 0 {
-				link.lanesList[0] = wayOSM.lanesBackward
+				link.lanesNew = wayOSM.lanesBackward
 			} else if wayOSM.lanes >= 0 {
-				link.lanesList[0] = int(math.Ceil(float64(wayOSM.lanes) / 2.0))
+				link.lanesNew = int(math.Ceil(float64(wayOSM.lanes) / 2.0))
 			} else {
-				link.lanesList[0] = wayOSM.lanes
+				link.lanesNew = wayOSM.lanes
 			}
 		default:
 			panic("Should not happen!")
 		}
 	}
-	if link.lanesList[0] <= 0 {
-		link.lanesList[0] = defaultLanesByLinkType[link.linkType]
+	if link.lanesNew <= 0 {
+		link.lanesNew = defaultLanesByLinkType[link.linkType]
 	}
 
 	// Walk all segment nodes except the first and the last one to detect links under traffic light control
@@ -165,8 +168,91 @@ func networkLinkFromOSM(id NetworkLinkID, sourceNodeID, targetNodeID NetworkNode
 	return &link
 }
 
-func (link *NetworkLink) GetLanes() int {
+func (link *NetworkLink) prepareLanes() {
+	link.lanesList = make([]int, 0)
+	link.lanesChange = make([][2]int, 0)
+	link.lanesChangePoints = make([]float64, 0)
+
+	lanesChangePointsTemp := []float64{0.0, link.lengthMeters}
+	if link.lengthMeters < resolution {
+		link.lanesChangePoints = []float64{0.0, link.lengthMeters}
+	} else {
+		for len(lanesChangePointsTemp) != 0 {
+			target := lanesChangePointsTemp[0]
+			remove := make(map[int]struct{})
+			for idx, point := range lanesChangePointsTemp {
+				if target-resolution <= point && point <= target+resolution {
+					remove[idx] = struct{}{}
+				}
+			}
+			link.lanesChangePoints = append(link.lanesChangePoints, target)
+			for idx := range remove {
+				lanesChangePointsTemp = append(lanesChangePointsTemp[:idx], lanesChangePointsTemp[idx+1:]...)
+			}
+		}
+		sort.Float64s(link.lanesChangePoints)
+	}
+
+	for i := 0; i < len(link.lanesChangePoints)-1; i++ {
+		link.lanesList = append(link.lanesList, link.lanesNew)
+		link.lanesChange = append(link.lanesChange, [2]int{0.0, 0.0})
+	}
+}
+
+func (link *NetworkLink) GetIncomingLanes() int {
 	return link.lanesList[0]
+}
+
+func (link *NetworkLink) GetOutcomingLanes() int {
+	idx := len(link.lanesList) - 1
+	if idx < 0 {
+		fmt.Printf("[WARNING]: Macroscopic link %d has no outcoming lanes", link.ID)
+		return -1
+	}
+	return link.lanesList[idx]
+}
+
+func (link *NetworkLink) GetIncomingLaneIndices() []int {
+	return link._laneIndices(link.lanesChange[0][0], link.lanesChange[0][1])
+}
+
+func (link *NetworkLink) GetOutcomingLaneIndices() []int {
+	idx := len(link.lanesChange) - 1
+	if idx < 0 {
+		fmt.Printf("[WARNING]: Macroscopic link %d has no lanes change", link.ID)
+		return make([]int, 0)
+	}
+	return link._laneIndices(link.lanesChange[idx][0], link.lanesChange[idx][1])
+}
+
+func (link *NetworkLink) _laneIndices(lanesChangeLeft int, lanesChangeRight int) []int {
+	return laneIndices(link.lanesNew, lanesChangeLeft, lanesChangeRight)
+}
+
+func laneIndices(lanes int, lanesChangeLeft int, lanesChangeRight int) []int {
+	laneIndices := make([]int, lanes)
+	for i := 1; i <= lanes; i++ {
+		laneIndices[i-1] = i
+	}
+	if lanesChangeLeft < 0 {
+		laneIndices = laneIndices[-lanesChangeLeft:]
+	} else if lanesChangeLeft > 0 {
+		left := make([]int, lanesChangeLeft)
+		for i := range left {
+			left[i] = -lanesChangeLeft + i
+		}
+		laneIndices = append(left, laneIndices...)
+	}
+	if lanesChangeRight < 0 {
+		laneIndices = laneIndices[:lanes+lanesChangeRight]
+	} else if lanesChangeRight > 0 {
+		right := make([]int, lanesChangeRight)
+		for i := range right {
+			right[i] = lanes + 1 + i
+		}
+		laneIndices = append(laneIndices, right...)
+	}
+	return laneIndices
 }
 
 func (link *NetworkLink) MaxLanes() int {
@@ -184,12 +270,13 @@ func (link *NetworkLink) MaxLanes() int {
 
 // Prepares cut length for link
 func (link *NetworkLink) calcCutLen() {
-	// Defife a variable downstream_max_cut which is the maximum length of a cut that can be made downstream of the link,
-	// calculated as the maximum of the _length_of_short_cut and the difference between the last two elements in the link.lanes_change_point_list minus 3.
-	downStreamMaxCut := math.Max(shortcutLen, link.breakpoints[len(link.breakpoints)-1]-link.breakpoints[len(link.breakpoints)-2]-3)
+	// Dodge potential change of number of lanes on two ends of the macroscopic link
+	upstreamMaxCut := math.Max(shortcutLen, link.lanesChangePoints[1]-link.lanesChangePoints[0]-3)
+	// Defife a variable downstreamMaxCut which is the maximum length of a cut that can be made downstream of the link,
+	// calculated as the maximum of the shortcutLen and the difference between the last two elements in the link.lanesChangePoints minus 3.
+	downstreamMaxCut := math.Max(shortcutLen, link.lanesChangePoints[len(link.lanesChangePoints)-1]-link.lanesChangePoints[len(link.lanesChangePoints)-2]-3)
 	if link.upstreamShortCut && link.downstreamShortCut {
 		totalLengthCut := 2 * shortcutLen * cutLenMin
-		_ = totalLengthCut
 		if link.lengthMetersOffset > totalLengthCut {
 			link.upstreamCutLen = shortcutLen
 			link.downstreamCutLen = shortcutLen
@@ -201,7 +288,7 @@ func (link *NetworkLink) calcCutLen() {
 		cutIdx := 0
 		cutPlaceFound := false
 		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
-			if link.lengthMetersOffset > math.Min(downStreamMaxCut, cutLen[i])+shortcutLen+cutLenMin {
+			if link.lengthMetersOffset > math.Min(downstreamMaxCut, cutLen[i])+shortcutLen+cutLenMin {
 				cutIdx = i
 				cutPlaceFound = true
 				break
@@ -209,9 +296,9 @@ func (link *NetworkLink) calcCutLen() {
 		}
 		if cutPlaceFound {
 			link.upstreamCutLen = shortcutLen
-			link.downstreamCutLen = math.Min(downStreamMaxCut, cutLen[cutIdx])
+			link.downstreamCutLen = math.Min(downstreamMaxCut, cutLen[cutIdx])
 		} else {
-			downStreamCut := math.Min(downStreamMaxCut, cutLen[0])
+			downStreamCut := math.Min(downstreamMaxCut, cutLen[0])
 			totalLen := downStreamCut + shortcutLen + cutLenMin
 			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * shortcutLen
 			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
@@ -220,17 +307,18 @@ func (link *NetworkLink) calcCutLen() {
 		cutIdx := 0
 		cutPlaceFound := false
 		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
-			if link.lengthMetersOffset > cutLen[i]+shortcutLen+cutLenMin {
+			if link.lengthMetersOffset > math.Min(upstreamMaxCut, cutLen[i])+shortcutLen+cutLenMin {
 				cutIdx = i
 				cutPlaceFound = true
 				break
 			}
 		}
 		if cutPlaceFound {
-			link.upstreamCutLen = cutLen[cutIdx]
+			link.upstreamCutLen = math.Min(upstreamMaxCut, cutLen[cutIdx])
 			link.downstreamCutLen = shortcutLen
 		} else {
-			totalLen := cutLen[0] + shortcutLen + cutLenMin
+			upStreamCut := math.Min(upstreamMaxCut, cutLen[0])
+			totalLen := upStreamCut + shortcutLen + cutLenMin
 			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
 			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * shortcutLen
 		}
@@ -238,19 +326,20 @@ func (link *NetworkLink) calcCutLen() {
 		cutIdx := 0
 		cutPlaceFound := false
 		for i := link.lanesList[len(link.lanesList)-1]; i >= 0; i-- {
-			if link.lengthMetersOffset > cutLen[i]+math.Min(downStreamMaxCut, cutLen[i])+cutLenMin {
+			if link.lengthMetersOffset > math.Min(upstreamMaxCut, cutLen[i])+math.Min(downstreamMaxCut, cutLen[i])+cutLenMin {
 				cutIdx = i
 				cutPlaceFound = true
 				break
 			}
 		}
 		if cutPlaceFound {
-			link.upstreamCutLen = cutLen[cutIdx]
-			link.downstreamCutLen = math.Min(downStreamMaxCut, cutLen[cutIdx])
+			link.upstreamCutLen = math.Min(upstreamMaxCut, cutLen[cutIdx])
+			link.downstreamCutLen = math.Min(downstreamMaxCut, cutLen[cutIdx])
 		} else {
-			downStreamCut := math.Min(downStreamMaxCut, cutLen[0])
-			totalLen := downStreamCut + cutLen[0] + cutLenMin
-			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * cutLen[0]
+			upStreamCut := math.Min(upstreamMaxCut, cutLen[0])
+			downStreamCut := math.Min(downstreamMaxCut, cutLen[0])
+			totalLen := downStreamCut + upStreamCut + cutLenMin
+			link.upstreamCutLen = (link.lengthMetersOffset / totalLen) * upStreamCut
 			link.downstreamCutLen = (link.lengthMetersOffset / totalLen) * downStreamCut
 		}
 	}
@@ -260,38 +349,40 @@ func (link *NetworkLink) calcCutLen() {
 func (link *NetworkLink) performCut() {
 
 	// Create copy for those since we will do mutations and want to keep original data
-	breakpoints := make([]float64, len(link.breakpoints))
-	copy(breakpoints, link.breakpoints)
+	lanesChangePoints := make([]float64, len(link.lanesChangePoints))
+	copy(lanesChangePoints, link.lanesChangePoints)
 	link.lanesListCut = make([]int, len(link.lanesList))
 	copy(link.lanesListCut, link.lanesList)
-	link.lanesChangeCut = make([][]int, len(link.lanesChange))
+	link.lanesChangeCut = make([][2]int, len(link.lanesChange))
 	copy(link.lanesChangeCut, link.lanesChange)
 
-	breakIdx := 1
-	for breakIdx = 1; breakIdx < len(breakpoints); breakIdx++ {
-		if breakpoints[breakIdx] > link.upstreamCutLen {
-			break
-		}
-	}
-	breakpoints = append(breakpoints[breakIdx:])
-	breakpoints = append([]float64{link.upstreamCutLen}, breakpoints...)
-	link.lanesListCut = link.lanesListCut[breakIdx-1:]
-	link.lanesChange = link.lanesChange[breakIdx-1:]
+	lanesChangePoints[0] = link.upstreamCutLen
+	lanesChangePoints[len(lanesChangePoints)-1] = link.lengthMetersOffset - link.downstreamCutLen
+	// breakIdx := 1
+	// for breakIdx = 1; breakIdx < len(lanesChangePoints); breakIdx++ {
+	// 	if lanesChangePoints[breakIdx] > link.upstreamCutLen {
+	// 		break
+	// 	}
+	// }
+	// lanesChangePoints = append(lanesChangePoints[breakIdx:])
+	// lanesChangePoints = append([]float64{link.upstreamCutLen}, lanesChangePoints...)
+	// link.lanesListCut = link.lanesListCut[breakIdx-1:]
+	// link.lanesChange = link.lanesChange[breakIdx-1:]
 
-	breakIdx = len(breakpoints) - 2
-	for breakIdx := len(breakpoints) - 2; breakIdx >= 0; breakIdx-- {
-		if link.lengthMetersOffset-breakpoints[breakIdx] > link.downstreamCutLen {
-			break
-		}
-	}
-	breakpoints = breakpoints[:breakIdx+1]
-	breakpoints = append(breakpoints, link.lengthMetersOffset-link.downstreamCutLen)
-	link.lanesListCut = link.lanesListCut[:breakIdx+1]
-	link.lanesChange = link.lanesChange[:breakIdx+1]
+	// breakIdx = len(lanesChangePoints) - 2
+	// for breakIdx := len(lanesChangePoints) - 2; breakIdx >= 0; breakIdx-- {
+	// 	if link.lengthMetersOffset-lanesChangePoints[breakIdx] > link.downstreamCutLen {
+	// 		break
+	// 	}
+	// }
+	// lanesChangePoints = lanesChangePoints[:breakIdx+1]
+	// lanesChangePoints = append(lanesChangePoints, link.lengthMetersOffset-link.downstreamCutLen)
+	// link.lanesListCut = link.lanesListCut[:breakIdx+1]
+	// link.lanesChange = link.lanesChange[:breakIdx+1]
 
 	for i := range link.lanesListCut {
-		start := breakpoints[i]
-		end := breakpoints[i+1]
+		start := lanesChangePoints[i]
+		end := lanesChangePoints[i+1]
 		geomCut := SubstringHaversine(link.geomOffset, start, end)
 		geomEuclideanCut := lineToEuclidean(geomCut)
 		link.geomOffsetCut = append(link.geomOffsetCut, geomCut)

@@ -588,24 +588,24 @@ func genMicroscopicNetwork(macroNet *NetworkMacroscopic, mesoNet *NetworkMesosco
 		return nil, errors.Wrap(err, "Can't connect microscopic links for movement layer")
 	}
 
-	err = microscopic.updateBoundaryType(mesoNet)
-	if err != nil {
-		return nil, errors.Wrap(err, "Can't update boundary type for microscopic nodes")
-	}
+	// err = microscopic.updateBoundaryType(mesoNet)
+	// if err != nil {
+	// 	return nil, errors.Wrap(err, "Can't update boundary type for microscopic nodes")
+	// }
 
-	// Update movement composite type
-	// It could be done in previous loops, but it is more clear to do it here
-	for _, link := range microscopic.links {
-		if !link.isFirstMovement {
-			link.movementCompositeType = MOVEMENT_NONE
-			continue
-		}
-		mesoLink, ok := mesoNet.links[link.mesoLinkID]
-		if !ok {
-			return nil, fmt.Errorf("genMicroscopicNetwork(): Mesoscopic link %d for miscroscopic link %d not found", link.mesoLinkID, link.ID)
-		}
-		link.movementCompositeType = mesoLink.movementCompositeType
-	}
+	// // Update movement composite type
+	// // It could be done in previous loops, but it is more clear to do it here
+	// for _, link := range microscopic.links {
+	// 	if !link.isFirstMovement {
+	// 		link.movementCompositeType = MOVEMENT_NONE
+	// 		continue
+	// 	}
+	// 	mesoLink, ok := mesoNet.links[link.mesoLinkID]
+	// 	if !ok {
+	// 		return nil, fmt.Errorf("genMicroscopicNetwork(): Mesoscopic link %d for miscroscopic link %d not found", link.mesoLinkID, link.ID)
+	// 	}
+	// 	link.movementCompositeType = mesoLink.movementCompositeType
+	// }
 
 	if verbose {
 		fmt.Printf("Done in %v\n", time.Since(st))
@@ -628,7 +628,7 @@ func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, m
 			if mesoLink.movementLinkIncome < 0 || mesoLink.movementLinkOutcome < 0 {
 				return fmt.Errorf("connectLinks(): Mesoscopic movement link %d has no income or outcome and movement is needed", mesoLink.ID)
 			}
-			if mesoLink.movementIncomeLaneStart < 0 || mesoLink.movementOutcomeLaneStart < 0 {
+			if mesoLink.movementIncomeLaneStartSeqID < 0 || mesoLink.movementOutcomeLaneStartSeqID < 0 {
 				return fmt.Errorf("connectLinks(): Mesoscopic movement link %d has no start lane index or end lane index and movement is needed", mesoLink.ID)
 			}
 			incomingMesoLink, ok := mesoNet.links[mesoLink.movementLinkIncome]
@@ -640,8 +640,8 @@ func (microNet *NetworkMicroscopic) connectLinks(macroNet *NetworkMacroscopic, m
 				return fmt.Errorf("connectLinks(): Outcoming mesoscopic link %d not found for mesoscopic movement link %d", mesoLink.movementLinkOutcome, mesoLink.ID)
 			}
 			for i := 0; i < mesoLink.lanesNum; i++ {
-				incomingMicroNodes := incomingMesoLink.microNodesPerLane[mesoLink.movementIncomeLaneStart+i]
-				outcomingMicroNodes := outcomingMesoLink.microNodesPerLane[mesoLink.movementOutcomeLaneStart+i]
+				incomingMicroNodes := incomingMesoLink.microNodesPerLane[mesoLink.movementIncomeLaneStartSeqID+i]
+				outcomingMicroNodes := outcomingMesoLink.microNodesPerLane[mesoLink.movementOutcomeLaneStartSeqID+i]
 
 				startMicroNodeID := incomingMicroNodes[len(incomingMicroNodes)-1]
 				endMicroNodeID := outcomingMicroNodes[0]

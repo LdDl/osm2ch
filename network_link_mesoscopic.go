@@ -8,7 +8,7 @@ type NetworkLinkMesoscopic struct {
 	geom          orb.LineString
 	geomEuclidean orb.LineString
 	lanesNum      int
-	lanesChange   []int
+	lanesChange   [2]int
 
 	ID NetworkLinkID
 
@@ -19,12 +19,12 @@ type NetworkLinkMesoscopic struct {
 	macroNodeID NetworkNodeID
 
 	/* Movement information */
-	movementID               MovementID
-	movementCompositeType    MovementCompositeType // Inherited from movement
-	movementLinkIncome       NetworkLinkID
-	movementLinkOutcome      NetworkLinkID
-	movementIncomeLaneStart  int
-	movementOutcomeLaneStart int
+	movementID                    MovementID
+	movementCompositeType         MovementCompositeType // Inherited from movement
+	movementLinkIncome            NetworkLinkID
+	movementLinkOutcome           NetworkLinkID
+	movementIncomeLaneStartSeqID  int
+	movementOutcomeLaneStartSeqID int
 
 	controlType       ControlType // Inherited from macroscopic node
 	linkType          LinkType    // Inherited either from macroscopic link or from first incoming incident edge in macroscopic node

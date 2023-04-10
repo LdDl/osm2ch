@@ -72,7 +72,7 @@ func (net *NetworkMacroscopic) exportLinksToCSV(fname string) error {
 			fmt.Sprintf("%s", link.controlType),
 			strings.Join(allowedAgentTypes, ","),
 			fmt.Sprintf("%t", link.wasBidirectional),
-			fmt.Sprintf("%d", link.GetLanes()),
+			fmt.Sprintf("%d", link.lanesNew),
 			fmt.Sprintf("%f", link.maxSpeed),
 			fmt.Sprintf("%f", link.freeSpeed),
 			fmt.Sprintf("%d", link.capacity),

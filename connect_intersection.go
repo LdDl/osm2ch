@@ -46,26 +46,26 @@ func getIntersectionsConnections(incomingLink *NetworkLink, outcomingLinks []*Ne
 
 	// Evaluate lanes connections
 	connections := make([][]connectionPair, len(outcomingLinksSorted))
-	outcomingLanes := incomingLink.lanesList[len(incomingLink.lanesList)-1]
+	outcomingLanes := incomingLink.GetOutcomingLanes()
 	if outcomingLanes == 1 {
 		leftLink := outcomingLinksSorted[0]
 		connections[indicesMap[leftLink.ID]] = []connectionPair{{0, 0}, {0, 0}}
 		for _, link := range outcomingLinksSorted[1:] {
-			connections[indicesMap[link.ID]] = []connectionPair{{0, 0}, {link.GetLanes() - 1, link.GetLanes() - 1}}
+			connections[indicesMap[link.ID]] = []connectionPair{{0, 0}, {link.GetIncomingLanes() - 1, link.GetIncomingLanes() - 1}}
 		}
 		// fmt.Println("\t\t\t", connections)
 		return connections
 	}
 	if len(outcomingLinksSorted) == 1 { // Full connection
 		link := outcomingLinksSorted[0]
-		minConnections := min(outcomingLanes, link.GetLanes())
+		minConnections := min(outcomingLanes, link.GetIncomingLanes())
 		connections[indicesMap[link.ID]] = []connectionPair{{0, minConnections - 1}, {0, minConnections - 1}}
 	} else if len(outcomingLinksSorted) == 2 { // Default right, remaining left
 		leftLink := outcomingLinksSorted[0]
-		minConnections := min(outcomingLanes-defaultLeftMostLanes, leftLink.GetLanes())
+		minConnections := min(outcomingLanes-defaultLeftMostLanes, leftLink.GetIncomingLanes()) // If link has incoming lanes
 		connections[indicesMap[leftLink.ID]] = []connectionPair{{0, minConnections - 1}, {0, minConnections - 1}}
 		rightLink := outcomingLinksSorted[len(outcomingLinksSorted)-1]
-		connections[indicesMap[rightLink.ID]] = []connectionPair{{outcomingLanes - defaultRightMostLanes, outcomingLanes - 1}, {rightLink.GetLanes() - defaultRightMostLanes, rightLink.GetLanes() - 1}}
+		connections[indicesMap[rightLink.ID]] = []connectionPair{{outcomingLanes - defaultRightMostLanes, outcomingLanes - 1}, {rightLink.GetIncomingLanes() - defaultRightMostLanes, rightLink.GetIncomingLanes() - 1}}
 	} else { // >= 3, default left, default right, remaining middle
 		leftLink := outcomingLinksSorted[0]
 		connections[indicesMap[leftLink.ID]] = []connectionPair{{0, defaultLeftMostLanes - 1}, {0, defaultLeftMostLanes - 1}}
@@ -74,7 +74,7 @@ func getIntersectionsConnections(incomingLink *NetworkLink, outcomingLinks []*Ne
 		assignedToMiddle := make([]int, len(middleLinks))
 		middleLinksLanes := make([]int, len(middleLinks))
 		for i, midLink := range middleLinks {
-			middleLinksLanes[i] = midLink.GetLanes()
+			middleLinksLanes[i] = midLink.GetIncomingLanes()
 		}
 		leftLanesNum := outcomingLanes - defaultLeftMostLanes - defaultRightMostLanes
 		if leftLanesNum >= len(middleLinks) {
@@ -93,7 +93,7 @@ func getIntersectionsConnections(incomingLink *NetworkLink, outcomingLinks []*Ne
 				}
 			}
 			for idx, middleLink := range middleLinks {
-				connections[indicesMap[middleLink.ID]] = []connectionPair{{startLaneNumber, startLaneNumber + assignedToMiddle[idx] - 1}, {middleLink.GetLanes() - assignedToMiddle[idx], middleLink.GetLanes() - 1}}
+				connections[indicesMap[middleLink.ID]] = []connectionPair{{startLaneNumber, startLaneNumber + assignedToMiddle[idx] - 1}, {middleLink.GetIncomingLanes() - assignedToMiddle[idx], middleLink.GetIncomingLanes() - 1}}
 				startLaneNumber += assignedToMiddle[idx]
 			}
 		} else if outcomingLanes < len(middleLinks) {
@@ -102,13 +102,13 @@ func getIntersectionsConnections(incomingLink *NetworkLink, outcomingLinks []*Ne
 			for laneNumber = 0; laneNumber < outcomingLanes-1; laneNumber++ {
 				linkIndex = laneNumber
 				middleLink := middleLinks[linkIndex]
-				connections[indicesMap[middleLink.ID]] = []connectionPair{{laneNumber, laneNumber}, {middleLink.GetLanes() - 1, middleLink.GetLanes() - 1}}
+				connections[indicesMap[middleLink.ID]] = []connectionPair{{laneNumber, laneNumber}, {middleLink.GetIncomingLanes() - 1, middleLink.GetIncomingLanes() - 1}}
 			}
 			laneNumber++
 			startLinkIndex := linkIndex + 1
 			for linkIndex = startLinkIndex; linkIndex < len(middleLinks); linkIndex++ {
 				middleLink := middleLinks[linkIndex]
-				connections[indicesMap[middleLink.ID]] = []connectionPair{{laneNumber, laneNumber}, {middleLink.GetLanes() - 1, middleLink.GetLanes() - 1}}
+				connections[indicesMap[middleLink.ID]] = []connectionPair{{laneNumber, laneNumber}, {middleLink.GetIncomingLanes() - 1, middleLink.GetIncomingLanes() - 1}}
 			}
 		} else {
 			startLaneNumber := 0
@@ -118,12 +118,12 @@ func getIntersectionsConnections(incomingLink *NetworkLink, outcomingLinks []*Ne
 				startLaneNumber = 0
 			}
 			for _, midLink := range middleLinks {
-				connections[indicesMap[midLink.ID]] = []connectionPair{{startLaneNumber, startLaneNumber}, {midLink.GetLanes() - 1, midLink.GetLanes() - 1}}
+				connections[indicesMap[midLink.ID]] = []connectionPair{{startLaneNumber, startLaneNumber}, {midLink.GetIncomingLanes() - 1, midLink.GetIncomingLanes() - 1}}
 				startLaneNumber++
 			}
 		}
 		rightLink := outcomingLinksSorted[len(outcomingLinksSorted)-1]
-		connections[indicesMap[rightLink.ID]] = []connectionPair{{outcomingLanes - defaultRightMostLanes, outcomingLanes - 1}, {rightLink.GetLanes() - defaultRightMostLanes, rightLink.GetLanes() - 1}}
+		connections[indicesMap[rightLink.ID]] = []connectionPair{{outcomingLanes - defaultRightMostLanes, outcomingLanes - 1}, {rightLink.GetIncomingLanes() - defaultRightMostLanes, rightLink.GetIncomingLanes() - 1}}
 	}
 
 	return connections
