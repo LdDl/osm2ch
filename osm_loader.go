@@ -284,14 +284,24 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 
 	fmt.Printf("Applying edge expanding technique...")
 	st = time.Now()
+
+	// create edge index by SourceNodeID
+	edgesBySourceNodeID := make(map[osm.NodeID][]EdgeID)
+	for _, edge := range edges {
+		edgesBySourceNodeID[edge.SourceNodeID] = append(edgesBySourceNodeID[edge.SourceNodeID], edge.ID)
+	}
+
 	cycles := 0
 	expandedEdges := []ExpandedEdge{}
 	expandedEdgesTotal := int64(0)
 	for _, edge := range edges {
 		edgeAsFromVertex := edge
 		costMetersFromVertex := edgeAsFromVertex.CostMeters
-		outcomingEdges := findOutComingEdges(edgeAsFromVertex, edges)
+		outcomingEdges := edgesBySourceNodeID[edgeAsFromVertex.TargetNodeID]
 		for _, outcomingEdge := range outcomingEdges {
+			if outcomingEdge == edgeAsFromVertex.ID {
+				continue
+			}
 			edgeAsToVertex := edges[outcomingEdge-1] // We assuming that EdgeID == (SliceIndex + 1) which is equivalent to SliceIndex == (EdgeID - 1)
 			// cycles, u-turn?
 			// @todo: some of those are deadend (or 'boundary') edges
