@@ -16,14 +16,3 @@ type Edge struct {
 	/* CostSeconds  float64 */ //@todo: consider cost customization
 	Geom                       []GeoPoint
 }
-
-// findOutComingEdges returns IDs of edges for given OSM Way object
-func findOutComingEdges(givenEdge Edge, edges []Edge) []EdgeID {
-	result := []EdgeID{}
-	for _, edge := range edges {
-		if edge.SourceNodeID == givenEdge.TargetNodeID && edge.ID != givenEdge.ID {
-			result = append(result, edge.ID)
-		}
-	}
-	return result
-}
