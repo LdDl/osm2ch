@@ -9,3 +9,4 @@ cmd/osm2ch/osm2ch
 cmd/osm2ch/example_data/map.osm
 cmd/osm2ch/example_data/map.osm.pbf
 *.csv
+df/

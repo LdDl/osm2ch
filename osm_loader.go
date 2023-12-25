@@ -304,7 +304,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 			}
 			edgeAsToVertex := edges[outcomingEdge-1] // We assuming that EdgeID == (SliceIndex + 1) which is equivalent to SliceIndex == (EdgeID - 1)
 			// cycles, u-turn?
-			// @todo: some of those are deadend (or 'boundary') edges
+			// @TODO: some of those are deadend (or 'boundary') edges
 			if edgeAsFromVertex.Geom[0] == edgeAsToVertex.Geom[len(edgeAsToVertex.Geom)-1] && edgeAsFromVertex.Geom[len(edgeAsFromVertex.Geom)-1] == edgeAsToVertex.Geom[0] {
 				// fmt.Println(PrepareGeoJSONLinestring(edgeAsFromVertex.Geom))
 				cycles++
@@ -342,7 +342,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 	fmt.Printf("\tIgnored cycles: %d\n", cycles)
 	fmt.Printf("\tNumber of expanded edges: %d\n", expandedEdgesTotal)
 
-	// @todo: work with maneuvers (restrictions)
+	// @TODO: work with maneuvers (restrictions)
 	fmt.Printf("Working with maneuvers (restrictions)...")
 	st = time.Now()
 	// Handling restrictions of "no" type
@@ -383,7 +383,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 			}
 			break
 		default:
-			// @todo: need to think about U-turns: "no_u_turn"
+			// @TODO: need to think about U-turns: "no_u_turn"
 			break
 		}
 	}
@@ -425,7 +425,7 @@ func ImportFromOSMFile(fileName string, cfg *OsmConfiguration) ([]ExpandedEdge, 
 			}
 			break
 		default:
-			// @todo: need to think about U-turns: "no_u_turn"
+			// @TODO: need to think about U-turns: "no_u_turn"
 			break
 		}
 
