@@ -2,7 +2,8 @@ package osm2ch
 
 import "github.com/paulmach/osm"
 
-// ExpandedGraph represents an edge in expanded graph
+// ExpandedEdge represents an edge in the edge-expanded graph.
+// Source and Target are IDs of the original macro links (edges).
 type ExpandedEdge struct {
 	ID              int64
 	Source          EdgeID
@@ -12,19 +13,13 @@ type ExpandedEdge struct {
 	SourceComponent expandedEdgeComponent
 	TargeComponent  expandedEdgeComponent
 	WasOneway       bool
-	CostMeters      float64
-	/* CostSeconds  float64 */ //@todo: consider cost customization
-	Geom                       []GeoPoint
+	LengthMeters    float64
+	FreeSpeed       float64
+	Geom            []GeoPoint
 }
 
-// expandedEdgeComponent represents former Way
+// expandedEdgeComponent represents source/target nodes of the original macro link
 type expandedEdgeComponent struct {
 	SourceNodeID osm.NodeID
 	TargetNodeID osm.NodeID
-}
-
-// restrictionComponent represents member of restriction relation. Could be either way or node.
-type restrictionComponent struct {
-	ID   int64
-	Type string
 }

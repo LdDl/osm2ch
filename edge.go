@@ -12,7 +12,7 @@ type Edge struct {
 	SourceNodeID osm.NodeID
 	TargetNodeID osm.NodeID
 	WasOneway    bool
-	CostMeters   float64
-	/* CostSeconds  float64 */ //@todo: consider cost customization
-	Geom                       []GeoPoint
+	LengthMeters float64
+	FreeSpeed    float64
+	Geom         []GeoPoint
 }
