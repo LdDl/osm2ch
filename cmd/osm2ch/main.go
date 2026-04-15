@@ -92,8 +92,13 @@ func main() {
 			fmt.Printf("Can not create target vertex: %v\n", err)
 			return
 		}
-		// CH uses length_meters as weight for now
-		err = graph.AddEdge(source, target, edge.LengthMeters)
+		// CH weight = travel time in seconds: length_meters / (free_speed_kmh / 3.6)
+		// Must match horizon's CostResolver formula: length_meters / (free_speed / 3.6)
+		edgeWeight := edge.LengthMeters // fallback: assume 1 m/s if no speed
+		if edge.FreeSpeed > 0 {
+			edgeWeight = edge.LengthMeters / (edge.FreeSpeed / 3.6)
+		}
+		err = graph.AddEdge(source, target, edgeWeight)
 		if err != nil {
 			fmt.Printf("Can not add edge: %v\n", err)
 			return

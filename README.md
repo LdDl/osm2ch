@@ -87,7 +87,6 @@ osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf
 ```
 
 After that 3 files will be created: `graph.csv` (edges), `graph_vertices.csv`, `graph_shortcuts.csv`.
-After that files 'graph.csv', 'graph_vertices.csv', 'graph_shortcuts.csv' will be created.
 
 ## Output format
 
@@ -134,8 +133,12 @@ Header: `from_vertex_id;to_vertex_id;weight;via_vertex_id`
 |--------|------|-------------|
 | from_vertex_id | int64 | Source vertex |
 | to_vertex_id | int64 | Target vertex |
-| weight | float64 | Shortcut weight (length in meters) |
+| weight | float64 | Shortcut cost in **seconds** (travel time) |
 | via_vertex_id | int64 | Intermediate vertex |
+
+Contraction hierarchies are built using **travel time** (seconds) as the cost metric: `length_meters / (free_speed_kmh / 3.6)`. Shortcut costs are also in seconds.
+
+If you need route distance in meters (e.g. for map matching transition probabilities), sum up `length_meters` of each edge along the CH path.
 
 Now you can use this graph in [contraction hierarchies library].
 
