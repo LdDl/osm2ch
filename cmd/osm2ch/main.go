@@ -52,6 +52,8 @@ func main() {
 		"osm_way_from", "osm_way_to",
 		"osm_way_from_source_node", "osm_way_from_target_node",
 		"osm_way_to_source_node", "osm_way_to_target_node",
+		"macro_node_from_source", "macro_node_from_target",
+		"macro_node_to_source", "macro_node_to_target",
 	})
 	if err != nil {
 		fmt.Println(err)
@@ -124,6 +126,10 @@ func main() {
 			fmt.Sprintf("%d", edge.ID),
 			fmt.Sprintf("%d", edge.SourceOSMWayID),
 			fmt.Sprintf("%d", edge.TargetOSMWayID),
+			fmt.Sprintf("%d", edge.SourceComponent.SourceOSMNodeID),
+			fmt.Sprintf("%d", edge.SourceComponent.TargetOSMNodeID),
+			fmt.Sprintf("%d", edge.TargeComponent.SourceOSMNodeID),
+			fmt.Sprintf("%d", edge.TargeComponent.TargetOSMNodeID),
 			fmt.Sprintf("%d", edge.SourceComponent.SourceNodeID),
 			fmt.Sprintf("%d", edge.SourceComponent.TargetNodeID),
 			fmt.Sprintf("%d", edge.TargeComponent.SourceNodeID),

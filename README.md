@@ -7,51 +7,51 @@
 ## Convert *.osm.pbf files to CSV for [contraction hierarchies library](https://github.com/LdDl/ch)
 
 - [osm2ch](#osm2ch)
-  - [Convert *.osm.pbf files to CSV for contraction hierarchies library](#convert-osmpbf-files-to-csv-for-contraction-hierarchies-library)
   - [About](#about)
   - [Installation](#installation)
   - [Usage](#usage)
   - [Example](#example)
+  - [Output format](#output-format)
   - [Dependencies](#dependencies)
   - [License](#license)
 
 ## About
 With this CLI tool you can convert *.osm.pbf (Compressed Open Street Map) file to CSV (Comma-Separated Values) file, which is used in our [contraction hierarchies library].
+
+Under the hood it uses [`osm2gmns`](https://github.com/LdDl/osm2gmns) library (Go port of [osm2gmns](https://osm2gmns.readthedocs.io/en/stable/)) to build a macroscopic graph with turning movements, then this CLI performs edge expansion and contraction hierarchies.
+
 What it does:
-- Edge expansion (single edge == single vertex);
-- Handles some kind and types of restrictions:
-    - Supported kind of restrictions:
-        - EdgeFrom - NodeVia - EdgeTo.
-    - Supported types of restrictions:
-        - only_left_turn;
-        - only_right_turn;
-        - only_straight_on;
-        - no_left_turn;
-        - no_right_turn;
-        - no_straight_on.
-- Saves CSV file with geom in WKT format;
-- Currently supports tags for 'highway' OSM entity only.
+- Builds macroscopic network from OSM via [`osm2gmns`](https://github.com/LdDl/osm2gmns);
+- Generates turning movements at intersections;
+- Performs edge expansion (each macro link becomes a vertex, movements become edges);
+- Filters U-turns;
+- Supported types of restrictions (internally processed in `osm2gmns`):
+      - only_left_turn;
+      - only_right_turn;
+      - only_straight_on;
+      - no_left_turn;
+      - no_right_turn;
+      - no_straight_on.
+- Prepares contraction hierarchies;
+- Outputs CSV files with geometry in WKT or GeoJSON format.
+
+Agent type filtering is handled by `osm2gmns` (e.g. `auto`, `bike`, `walk`).
 
 PRs are welcome!
 
 ## Installation
-* Via 'go get':
+* Via 'go install':
     ```shell
-    go get github.com/LdDl/osm2ch
-    go install github.com/LdDl/osm2ch/cmd/osm2ch@v1.5.1
+    go install github.com/LdDl/osm2ch/cmd/osm2ch@latest
     ```
     After installation step is complete you can call 'osm2ch' from any place in your system.
 
-* Or download prebuilt binary and make updates in yours PATH environment varibale (both Linux and Windows):
-    * Windows - https://github.com/LdDl/osm2ch/releases/download/v1.5.1/windows-osm2ch.zip
-    * Linux - https://github.com/LdDl/osm2ch/releases/download/v1.5.1/linux-amd64-osm2ch.tar.gz
+* Or download prebuilt binary from [Releases](https://github.com/LdDl/osm2ch/releases) and add it to your PATH.
 
-Note: There is [zlib](https://www.zlib.net/) support in [OSM-pbf parser](https://github.com/paulmach/osm/pull/19).
-If you do not want use it then disable CGO:
-```shell
-export CGO_ENABLED=0
-# Then build osm2ch from source
-```
+* Docker:
+    ```shell
+    docker pull dimahkiin/osm2ch:latest
+    ```
 
 ## Usage
 
@@ -64,75 +64,89 @@ Output:
 Usage of osm2ch:
   -file string
         Filename of *.osm.pbf file (it has to be compressed) (default "my_graph.osm.pbf")
-  -geomf string
-        Format of output geometry. Expected values: wkt / geojson (default "wkt")
   -out string
         Filename of 'Comma-Separated Values' (CSV) formatted file (default "my_graph.csv")
         E.g.: if file name is 'map.csv' then 3 files will be produced: 'map.csv' (edges), 'map_vertices.csv', 'map_shortcuts.csv'
-  -tags string
-        Set of needed tags (separated by commas) (default "motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link,motorway_link")
-  -units string
-        Units of output weights. Expected values: km for kilometers / m for meters (default "km")
-  -contract
-        Prepare contraction hierarchies? (default true)
+  -geomf string
+        Format of output geometry. Expected values: wkt / geojson (default "wkt")
+  -agents string
+        Comma-separated list of agent types. Expected values: auto,bike,walk (default "auto")
 ```
-The default list of tags is this, since usually these tags are used for routing for personal cars.
-
 
 ## Example
 You can find example file of *.osm.pbf file in nested child [/example_data](/example_data).
 
-If you want WKT format for output geometry:
+If you want WKT format for output geometry and `auto` agent type:
 ```shell
-osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf wkt --units m --tags motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link,motorway_link --contract=true
+osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf wkt --agents auto
 ```
 
-If you want GeoJSON format for output geometry:
+If you want GeoJSON format for output geometry and `auto` agent type:
 ```shell
-osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf geojson --units m --tags motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link,motorway_link --contract=true
+osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf geojson --agents auto
 ```
 
-If you dont want to prepare contraction hierarchies then:
-```shell
-osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf wkt --units m --tags motorway,primary,primary_link,road,secondary,secondary_link,residential,tertiary,tertiary_link,unclassified,trunk,trunk_link,motorway_link --contract=false
-```
+After that 3 files will be created: `graph.csv` (edges), `graph_vertices.csv`, `graph_shortcuts.csv`.
+After that files 'graph.csv', 'graph_vertices.csv', 'graph_shortcuts.csv' will be created.
 
-After that files 'graph.csv', 'graph_vertices.csv', 'graph_shortcuts.csv' will be created (or only 'graph.csv' and 'graph_vertices' if 'contract' flag is set to False).
+## Output format
 
-Header of edges CSV-file is: `from_vertex_id;to_vertex_id;weight;geom;was_one_way;edge_id;osm_way_from;osm_way_to;osm_way_from_source_node;osm_way_from_target_node;osm_way_to_source_node;osm_way_to_target_node`
-- from_vertex_id - Generated source vertex;
-- to_vertex_id - Generated target vertex;
-- weight - Traveling cost from source to target (actually length of an edge in kilometers/meters);
-- geom - Geometry of edge (Linestring) in WKT or GeoJSON format.
-- was_one_way - Boolean value. When source OSM way was "one way" then it's true, otherwise it's false. Might be helpfull for ignore edges with WasOneWay=true when offesting overlapping two-way geometries in some GIS viewer
-- edge_id - ID of generated edge
-- osm_way_from - ID of source OSM Way
-- osm_way_to - ID of target OSM Way
-- osm_way_from_source_node - ID of first OSM Node in source OSM Way
-- osm_way_from_target_node - ID of last OSM Node in source OSM Way
-- osm_way_to_source_node - ID of first OSM Node in target OSM Way
-- osm_way_to_target_node - ID of last OSM Node in target OSM Way
+### Edges CSV
 
-Header of vertices CSV-file is: vertex_id;order_pos;importance;geom
-- vertex_id - Vertex;
-- order_pos - Order position in contraction hierarchies;
-- importance - Importance of vertex with respect to contraction hierarchies
-- geom - Geometry of vertex (Point) in WKT or GeoJSON format.
+Header: `from_vertex_id;to_vertex_id;length_meters;free_speed;geom;was_one_way;edge_id;osm_way_from;osm_way_to;osm_way_from_source_node;osm_way_from_target_node;osm_way_to_source_node;osm_way_to_target_node;macro_node_from_source;macro_node_from_target;macro_node_to_source;macro_node_to_target`
 
-[Optional] Header of shortcuts CSV-file is: from_vertex_id;to_vertex_id;weight;via_vertex_id
-- from_vertex_id - Source vertex;
-- to_vertex_id - Target vertex;
-- weight - Traveling cost from source to target (actually length of the shortcut in kilometers/meters);
-- via_vertex_id - ID of vertex through which the shortcut exists
+| Column | Type | Description |
+|--------|------|-------------|
+| from_vertex_id | int64 | Source vertex in edge-expanded graph (= source macro link ID) |
+| to_vertex_id | int64 | Target vertex in edge-expanded graph (= target macro link ID) |
+| length_meters | float64 | Length of the expanded edge in meters |
+| free_speed | float64 | Free-flow speed in km/h |
+| geom | string | Geometry (LineString) in WKT or GeoJSON format |
+| was_one_way | bool | True if the source OSM way was one-way |
+| edge_id | int64 | ID of the expanded edge |
+| osm_way_from | int64 | OSM Way ID of the source (income) macro link |
+| osm_way_to | int64 | OSM Way ID of the target (outcome) macro link |
+| osm_way_from_source_node | int64 | OSM Node ID at the start of the source macro link |
+| osm_way_from_target_node | int64 | OSM Node ID at the end of the source macro link |
+| osm_way_to_source_node | int64 | OSM Node ID at the start of the target macro link |
+| osm_way_to_target_node | int64 | OSM Node ID at the end of the target macro link |
+| macro_node_from_source | int | GMNS macro node ID at the start of the source macro link |
+| macro_node_from_target | int | GMNS macro node ID at the end of the source macro link |
+| macro_node_to_source | int | GMNS macro node ID at the start of the target macro link |
+| macro_node_to_target | int | GMNS macro node ID at the end of the target macro link |
+
+### Vertices CSV
+
+Header: `vertex_id;order_pos;importance;geom`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| vertex_id | int64 | Vertex ID (= macro link ID) |
+| order_pos | int | Order position in contraction hierarchies |
+| importance | int | Importance of vertex in contraction hierarchies |
+| geom | string | Geometry (Point) in WKT or GeoJSON format |
+
+### Shortcuts CSV
+
+Header: `from_vertex_id;to_vertex_id;weight;via_vertex_id`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| from_vertex_id | int64 | Source vertex |
+| to_vertex_id | int64 | Target vertex |
+| weight | float64 | Shortcut weight (length in meters) |
+| via_vertex_id | int64 | Intermediate vertex |
 
 Now you can use this graph in [contraction hierarchies library].
 
 ## Dependencies
-Thanks to [paulmach](https://github.com/paulmach) for his [OSM-parser](https://github.com/paulmach/osm) written in Go.
-
-Paulmach's license is [here](https://github.com/paulmach/osm/blob/master/LICENSE.md) (it's MIT)
+- [osm2gmns](https://github.com/LdDl/osm2gmns) - OSM to GMNS macroscopic network + movements
+- [go-gmns](https://github.com/LdDl/go-gmns) - GMNS data structures and generators
+- [ch](https://github.com/LdDl/ch) - Contraction hierarchies
+- [paulmach/osm](https://github.com/paulmach/osm) - OSM data types
+- [paulmach/orb](https://github.com/paulmach/orb) - Geometry types
 
 ## License
 - Please see [here](LICENSE.md)
 
-[contraction hierarchies library]: (https://github.com/LdDl/ch#ch---contraction-hierarchies)
+[contraction hierarchies library]: https://github.com/LdDl/ch#ch---contraction-hierarchies

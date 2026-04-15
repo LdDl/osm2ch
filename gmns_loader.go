@@ -10,7 +10,6 @@ import (
 	"github.com/LdDl/go-gmns/movement"
 	"github.com/LdDl/osm2gmns"
 	"github.com/paulmach/orb"
-	"github.com/paulmach/osm"
 )
 
 // ImportFromGMNS imports graph using osm2gmns library to build macro network + movements,
@@ -58,14 +57,16 @@ func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEd
 		lengthMeters := link.LengthMeters()
 		freeSpeed := link.FreeSpeed()
 		edges[link.ID] = Edge{
-			ID:           EdgeID(link.ID),
-			WayID:        link.OSMWay(),
-			SourceNodeID: osm.NodeID(link.SourceNode()),
-			TargetNodeID: osm.NodeID(link.TargetNode()),
-			WasOneway:    !link.WasBidirectional(),
-			LengthMeters: lengthMeters,
-			FreeSpeed:    freeSpeed,
-			Geom:         geom,
+			ID:              EdgeID(link.ID),
+			WayID:           link.OSMWay(),
+			SourceNodeID:    link.SourceNode(),
+			TargetNodeID:    link.TargetNode(),
+			SourceOSMNodeID: link.SourceOSMNode(),
+			TargetOSMNodeID: link.TargetOSMNode(),
+			WasOneway:       !link.WasBidirectional(),
+			LengthMeters:    lengthMeters,
+			FreeSpeed:       freeSpeed,
+			Geom:            geom,
 		}
 	}
 	fmt.Printf("Done in %v\n\tEdges: %d\n", time.Since(st), len(edges))
@@ -121,12 +122,16 @@ func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEd
 			SourceOSMWayID: inEdge.WayID,
 			TargetOSMWayID: outEdge.WayID,
 			SourceComponent: expandedEdgeComponent{
-				SourceNodeID: inEdge.SourceNodeID,
-				TargetNodeID: inEdge.TargetNodeID,
+				SourceNodeID:    inEdge.SourceNodeID,
+				TargetNodeID:    inEdge.TargetNodeID,
+				SourceOSMNodeID: inEdge.SourceOSMNodeID,
+				TargetOSMNodeID: inEdge.TargetOSMNodeID,
 			},
 			TargeComponent: expandedEdgeComponent{
-				SourceNodeID: outEdge.SourceNodeID,
-				TargetNodeID: outEdge.TargetNodeID,
+				SourceNodeID:    outEdge.SourceNodeID,
+				TargetNodeID:    outEdge.TargetNodeID,
+				SourceOSMNodeID: outEdge.SourceOSMNodeID,
+				TargetOSMNodeID: outEdge.TargetOSMNodeID,
 			},
 			LengthMeters: (inEdge.LengthMeters + outEdge.LengthMeters) / 2.0,
 			FreeSpeed:    (inEdge.FreeSpeed + outEdge.FreeSpeed) / 2.0,
