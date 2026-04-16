@@ -98,8 +98,8 @@ Header: `from_vertex_id;to_vertex_id;length_meters;free_speed;geom;was_one_way;e
 |--------|------|-------------|
 | from_vertex_id | int64 | Source vertex in edge-expanded graph (= source macro link ID) |
 | to_vertex_id | int64 | Target vertex in edge-expanded graph (= target macro link ID) |
-| length_meters | float64 | Length of the expanded edge in meters |
-| free_speed | float64 | Free-flow speed in km/h |
+| length_meters | float64 | Length of the expanded edge in meters (sum of the second half of the incoming macro link and the first half of the outgoing one) |
+| free_speed | float64 | Free-flow speed in km/h - see note below |
 | geom | string | Geometry (LineString) in WKT or GeoJSON format |
 | was_one_way | bool | True if the source OSM way was one-way |
 | edge_id | int64 | ID of the expanded edge |
@@ -137,6 +137,44 @@ Header: `from_vertex_id;to_vertex_id;weight;via_vertex_id`
 | via_vertex_id | int64 | Intermediate vertex |
 
 Contraction hierarchies are built using **travel time** (seconds) as the cost metric: `length_meters / (free_speed_kmh / 3.6)`. Shortcut costs are also in seconds.
+
+> **Note on `free_speed`.**
+> An expanded edge is assembled from two halves of two adjacent macro links (the second half of the incoming link + the first half of the outgoing one), which may have different free-flow speeds. To keep the total travel time physically consistent, `free_speed` is computed as a **length-weighted harmonic mean** of the two macro speeds:
+>
+> ```
+> free_speed = (inHalf + outHalf) / (inHalf / inSpeed + outHalf / outSpeed)
+> ```
+>
+> This guarantees that `length_meters / free_speed` equals the sum of the travel times across the two halves. A plain arithmetic mean would over-estimate the effective speed when the two halves differ significantly (e.g. a `motorway_link` at 30 km/h followed by a `motorway` at 100 km/h). If one of the macro links has a missing / zero speed, the other one is used as-is.
+>
+> **Worked example.** Suppose the incoming macro link is a `motorway_link` of length 60 m at 30 km/h, and the outgoing one is a `motorway` of length 100 m at 100 km/h. Then:
+>
+> ```
+> inHalf  = 60 / 2  = 30 m
+> outHalf = 100 / 2 = 50 m
+> totalLength = 30 + 50 = 80 m
+> ```
+>
+> True travel time across the expanded edge (physically correct reference):
+>
+> ```
+> t_in  = 30 m / (30  km/h / 3.6) = 30 * 3.6 /  30 = 3.6 s
+> t_out = 50 m / (100 km/h / 3.6) = 50 * 3.6 / 100 = 1.8 s
+> t_true = t_in + t_out = 5.4 s
+> ```
+>
+> Arithmetic mean (the old formula) would give `free_speed = (30 + 100) / 2 = 65 km/h`, implying a travel time of `80 * 3.6 / 65 ~= 4.43 s` - which is under-estimated by approximately 18%.
+>
+> Length-weighted harmonic mean (the current formula):
+>
+> ```
+> free_speed = (30 + 50) / (30/30 + 50/100)
+>            = 80 / (1.0 + 0.5)
+>            = 80 / 1.5
+>            ~= 53.33 km/h
+> ```
+>
+> Sanity-check: `80 * 3.6 / 53.33 = 5.4 s` - matches `t_true` exactly, as required.
 
 If you need route distance in meters (e.g. for map matching transition probabilities), sum up `length_meters` of each edge along the CH path.
 

@@ -10,3 +10,4 @@ cmd/osm2ch/example_data/map.osm.pbf
 *.csv
 build/
 dist/
+osm_data/

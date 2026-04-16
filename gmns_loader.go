@@ -114,6 +114,27 @@ func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEd
 
 		completedNewGeom := append(fromGeomHalf, toGeomHalf...)
 
+		// Expanded edge geometry consists of the second half of the incoming macro link
+		// and the first half of the outgoing macro link. Hence the total length is the
+		// sum of the halves, which equals the arithmetic mean of the two full lengths.
+		inHalf := inEdge.LengthMeters / 2.0
+		outHalf := outEdge.LengthMeters / 2.0
+		totalLength := inHalf + outHalf
+
+		// Free-flow speed is combined as a length-weighted harmonic mean so that
+		// travel time is preserved: totalLength / freeSpeed == inHalf/inSpeed + outHalf/outSpeed.
+		// Arithmetic mean would over-estimate the effective speed when the two halves
+		// differ substantially (e.g. motorway_link 30 km/h => motorway 100 km/h).
+		var freeSpeed float64
+		switch {
+		case inEdge.FreeSpeed > 0 && outEdge.FreeSpeed > 0:
+			freeSpeed = totalLength / (inHalf/inEdge.FreeSpeed + outHalf/outEdge.FreeSpeed)
+		case inEdge.FreeSpeed > 0:
+			freeSpeed = inEdge.FreeSpeed
+		case outEdge.FreeSpeed > 0:
+			freeSpeed = outEdge.FreeSpeed
+		}
+
 		expandedEdgesTotal++
 		expandedEdges = append(expandedEdges, ExpandedEdge{
 			ID:             expandedEdgesTotal,
@@ -133,8 +154,8 @@ func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEd
 				SourceOSMNodeID: outEdge.SourceOSMNodeID,
 				TargetOSMNodeID: outEdge.TargetOSMNodeID,
 			},
-			LengthMeters: (inEdge.LengthMeters + outEdge.LengthMeters) / 2.0,
-			FreeSpeed:    (inEdge.FreeSpeed + outEdge.FreeSpeed) / 2.0,
+			LengthMeters: totalLength,
+			FreeSpeed:    freeSpeed,
 			WasOneway:    inEdge.WasOneway,
 			Geom:         completedNewGeom,
 		})
