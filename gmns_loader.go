@@ -7,14 +7,32 @@ import (
 	"github.com/LdDl/go-gmns/generators"
 	"github.com/LdDl/go-gmns/gmns"
 	"github.com/LdDl/go-gmns/gmns/types"
+	"github.com/LdDl/go-gmns/macro"
 	"github.com/LdDl/go-gmns/movement"
 	"github.com/LdDl/osm2gmns"
 	"github.com/paulmach/orb"
 )
 
+// GMNSNetworks holds the intermediate GMNS networks produced while building the
+// expanded graph. They are exposed so callers can optionally export GMNS CSV
+// files (macro / movement) or generate and export the derived meso / micro
+// networks without re-parsing the OSM data.
+type GMNSNetworks struct {
+	Macro     *macro.Net
+	Movements movement.MovementsStorage
+}
+
 // ImportFromGMNS imports graph using osm2gmns library to build macro network + movements,
 // then performs edge expansion based on movements.
 func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEdge, error) {
+	expandedEdges, _, err := ImportFromGMNSWithNetworks(fileName, agentTypes)
+	return expandedEdges, err
+}
+
+// ImportFromGMNSWithNetworks behaves like ImportFromGMNS but additionally returns
+// the underlying GMNS networks (macro network and movements) so the caller can
+// optionally export them as GMNS CSV files.
+func ImportFromGMNSWithNetworks(fileName string, agentTypes []types.AgentType) ([]ExpandedEdge, *GMNSNetworks, error) {
 	// 1. Parse PBF via osm2gmns
 	parser := osm2gmns.NewParser(
 		fileName,
@@ -26,7 +44,7 @@ func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEd
 	st := time.Now()
 	osmData, err := parser.ReadOSM()
 	if err != nil {
-		return nil, fmt.Errorf("osm2gmns ReadOSM: %w", err)
+		return nil, nil, fmt.Errorf("osm2gmns ReadOSM: %w", err)
 	}
 	fmt.Printf("Done in %v\n", time.Since(st))
 
@@ -35,7 +53,7 @@ func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEd
 	st = time.Now()
 	macroNet, err := osm2gmns.GenerateMacroscopic(osmData, false)
 	if err != nil {
-		return nil, fmt.Errorf("osm2gmns GenerateMacroscopic: %w", err)
+		return nil, nil, fmt.Errorf("osm2gmns GenerateMacroscopic: %w", err)
 	}
 	fmt.Printf("Done in %v\n\tLinks: %d\n\tNodes: %d\n", time.Since(st), len(macroNet.Links), len(macroNet.Nodes))
 
@@ -44,7 +62,7 @@ func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEd
 	st = time.Now()
 	movements, err := generators.GenerateMovements(macroNet)
 	if err != nil {
-		return nil, fmt.Errorf("osm2gmns GenerateMovements: %w", err)
+		return nil, nil, fmt.Errorf("osm2gmns GenerateMovements: %w", err)
 	}
 	fmt.Printf("Done in %v\n\tMovements: %d\n", time.Since(st), len(movements))
 
@@ -166,7 +184,12 @@ func ImportFromGMNS(fileName string, agentTypes []types.AgentType) ([]ExpandedEd
 	fmt.Printf("\tSkipped bad geometry: %d\n", skippedBadGeom)
 	fmt.Printf("\tNumber of expanded edges: %d\n", expandedEdgesTotal)
 
-	return expandedEdges, nil
+	nets := &GMNSNetworks{
+		Macro:     macroNet,
+		Movements: movements,
+	}
+
+	return expandedEdges, nets, nil
 }
 
 // orbLineStringToGeoPoints converts orb.LineString to []GeoPoint

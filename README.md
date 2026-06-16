@@ -34,6 +34,7 @@ What it does:
       - no_straight_on.
 - Prepares contraction hierarchies;
 - Outputs CSV files with geometry in WKT or GeoJSON format.
+- Optionally exports the underlying GMNS networks (`macro`, `movement`, `meso`, `micro`) as CSV, just like `osm2gmns`.
 
 Agent type filtering is handled by `osm2gmns` (e.g. `auto`, `bike`, `walk`).
 
@@ -71,6 +72,10 @@ Usage of osm2ch:
         Format of output geometry. Expected values: wkt / geojson (default "wkt")
   -agents string
         Comma-separated list of agent types. Expected values: auto,bike,walk (default "auto")
+  -gmns string
+        Optional comma-separated list of GMNS network levels to export as CSV. Expected values: macro,movement,meso,micro. Empty (default) disables GMNS export
+  -gmns-dir string
+        Output directory for the exported GMNS CSV files (used only when -gmns is set) (default ".")
 ```
 
 ## Example
@@ -87,6 +92,29 @@ osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --geomf
 ```
 
 After that 3 files will be created: `graph.csv` (edges), `graph_vertices.csv`, `graph_shortcuts.csv`.
+
+### Exporting GMNS networks (optional)
+
+In addition to the contraction-hierarchies CSV files, you can optionally export the
+underlying [GMNS](https://github.com/zephyr-data-specs/GMNS) networks - the same way
+[osm2gmns](https://github.com/LdDl/osm2gmns) does. Pick any combination of network
+levels via `-gmns` (comma-separated): `macro`, `movement`, `meso`, `micro`.
+
+```shell
+osm2ch --file example_data/moscow_center_reduced.osm.pbf --out graph.csv --gmns macro,movement,meso,micro --gmns-dir ./gmns_out
+```
+
+Notes:
+- `meso` and `micro` are generated on demand (the meso network is built once and reused by `micro`), so requesting only `macro,movement` is fast and skips the heavier passes.
+- The OSM file is parsed only once: the macro network and movements used for contraction hierarchies are reused for the GMNS export.
+- Files written into `-gmns-dir` (osm2gmns naming convention):
+
+  | Level | Files |
+  |-------|-------|
+  | `macro` | `node.csv`, `link.csv` |
+  | `movement` | `movement.csv` |
+  | `meso` | `mesonode.csv`, `mesolink.csv` |
+  | `micro` | `micronode.csv`, `microlink.csv` |
 
 ## Output format
 
