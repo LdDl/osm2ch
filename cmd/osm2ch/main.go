@@ -18,6 +18,8 @@ var (
 	out         = flag.String("out", "my_graph.csv", "Filename of 'Comma-Separated Values' (CSV) formatted file. E.g.: if file name is 'map.csv' then 3 files will be produced: 'map.csv' (edges), 'map_vertices.csv', 'map_shortcuts.csv'")
 	geomFormat  = flag.String("geomf", "wkt", "Format of output geometry. Expected values: wkt / geojson")
 	agentsStr   = flag.String("agents", "auto", "Comma-separated list of agent types. Expected values: auto, bike, walk")
+	gmnsStr     = flag.String("gmns", "", "Optional comma-separated list of GMNS network levels to export as CSV. Expected values: macro, movement, meso, micro. Empty (default) disables GMNS export")
+	gmnsDir     = flag.String("gmns-dir", ".", "Output directory for the exported GMNS CSV files (used only when -gmns is set)")
 )
 
 func main() {
@@ -25,10 +27,19 @@ func main() {
 
 	agentTypes := parseAgentTypes(*agentsStr)
 
-	edgeExpandedGraph, err := osm2ch.ImportFromGMNS(*osmFileName, agentTypes)
+	edgeExpandedGraph, gmnsNets, err := osm2ch.ImportFromGMNSWithNetworks(*osmFileName, agentTypes)
 	if err != nil {
 		fmt.Println(err)
 		return
+	}
+
+	/* Optional GMNS network export */
+	gmnsLevels := osm2ch.ParseGMNSLevels(*gmnsStr)
+	if len(gmnsLevels) > 0 {
+		if err := osm2ch.ExportGMNS(gmnsNets, gmnsLevels, *gmnsDir); err != nil {
+			fmt.Printf("Can not export GMNS networks: %v\n", err)
+			return
+		}
 	}
 
 	fnamePart := strings.Split(*out, ".csv")
